@@ -173,10 +173,125 @@ void gb::Cycle() {
                 }
                 break;
             case 3: //11
+                if (opcode == 0xCB) {
+                    //todo: one cycle delay here
+                    CB_instruction = true;
+                }
+                else
+                    switch (get_bits_0_2(opcode)) {
+                        case 0:
+                            if (isbiton(5, opcode))
+                            {
+                                if (isbiton(3, opcode)) {
+                                    if (isbiton(4, opcode))
+                                        OP_LD_HL_SP_offset();
+                                    else
+                                        OP_ADD_SP();
+                                }
+                                else
+                                    OP_LDH(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                            }
+                            else
+                                OP_RET_test(get_bits_3_4(opcode));
+                            break;
+                        case 1:
+                            switch (get_bits_3_5(opcode)) {
+                                case 1:
+                                    OP_RET();
+                                    break;
+                                case 3:
+                                    OP_RETI();
+                                    break;
+                                case 5:
+                                    OP_JP_HL();
+                                    break;
+                                case 7:
+                                    OP_LD_SP_HL();
+                                    break;
+                                case 0:
+                                case 2:
+                                case 4:
+                                case 6:
+                                    OP_POP_r(get_bits_4_5(opcode));
+                            }
+                            break;
+                        case 2:
+                            if (isbiton(5, opcode)) {
+                                if (isbiton(3, opcode))
+                                    OP_LD_mem16(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                                else
+                                    OP_LDH(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                            }
+                            else
+                                OP_JP_test(get_bits_3_4(opcode));
+                            break;
+                        case 3:
+                            if (isbiton(4, opcode))
+                            {
+                                if (isbiton(3, opcode))
+                                    OP_EI();
+                                else
+                                    OP_DI();
+                            }
+                            else
+                                OP_JP();
+                            break;
+                        case 4:
+                            OP_CALL_test(get_bits_3_4(opcode));
+                            break;
+                        case 5:
+                            if (isbiton(3, opcode))
+                                OP_CALL();
+                            else
+                                OP_PUSH_r(get_bits_4_5(opcode));
+                            break;
+                        case 6:
+                            switch(get_bits_3_5(opcode)){
+                                case 0:
+                                    OP_ADD_A_imm();
+                                    break;
+                                case 1:
+                                    OP_ADC_A_imm();
+                                    break;
+                                case 2:
+                                    OP_SUB_A_imm();
+                                    break;
+                                case 3:
+                                    OP_SBC_A_imm();
+                                    break;
+                                case 4:
+                                    OP_AND_A_imm();
+                                    break;
+                                case 5:
+                                    OP_XOR_A_imm();
+                                    break;
+                                case 6:
+                                    OP_OR_A_imm();
+                                    break;
+                                case 7:
+                                    OP_CP_A_imm();
+                                    break;
+                            }
+                            break;
+                        case 7:
+                            OP_RST(get_bits_3_5(opcode));
+                            break;
+                    }
                 break;
             default:
                 OP_NOP();
         }
+    //todo: double check that this is correct operation of DI and EI
+    if (enable_interrupts)
+    {
+        interrupts_enabled = true;
+        enable_interrupts = false;
+    }
+    if (disable_interrupts)
+    {
+        interrupts_enabled = false;
+        disable_interrupts = false;
+    }
 }
 
 void gb::Joypad() {

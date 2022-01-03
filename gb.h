@@ -43,17 +43,27 @@ class gb {
     uint16_t SP{};              //16-bit stack pointer
 
     bool CB_instruction;
+    bool interrupts_enabled;
+    bool enable_interrupts;
+    bool disable_interrupts;
+
+    //getter and setters for flags
+    void set_Z(bool condition);
+    void set_N(bool condition);
+    void set_H(bool condition);
+    void set_C(bool condition);
+
 
     //helper functions
-    uint8_t get_bits_0_2(uint8_t op){ return (op & 0x07); };
-    uint8_t get_bits_3_5(uint8_t op){ return (op & 0x38) >> 3; };
-    uint8_t get_bits_4_5(uint8_t op){ return (op & 0x30) >> 4; };
-    uint8_t get_bits_3_4(uint8_t op){ return (op & 0x18) >> 3; };
-    bool isbiton(uint8_t num, uint8_t testbyte){ return ((0x01 << num) & testbyte) != 0x0;};
+    static uint8_t get_bits_0_2(uint8_t op){ return (op & 0x07); };
+    static uint8_t get_bits_3_5(uint8_t op){ return (op & 0x38) >> 3; };
+    static uint8_t get_bits_4_5(uint8_t op){ return (op & 0x30) >> 4; };
+    static uint8_t get_bits_3_4(uint8_t op){ return (op & 0x18) >> 3; };
+    static bool isbiton(uint8_t num, uint8_t testbyte){ return ((0x01 << num) & testbyte) != 0x0;};
 
-    //todo: opcode prototypes here
-    void OP_NOP(){};
+    void OP_NOP(){ /*todo: insert 1 cycle delay*/ };
     void OP_HALT();
+    void OP_RST(uint8_t xxx);
     //todo: organize this list
     void OP_LD(uint8_t xxx, uint8_t yyy);
     void OP_LD_imm(uint8_t xxx);
@@ -82,6 +92,31 @@ class gb {
     void OP_OR_r(uint8_t xxx);
     void OP_XOR_r(uint8_t xxx);
     void OP_CP_r(uint8_t xxx);
+    void OP_LD_mem16(uint8_t xxx, uint8_t yyy);
+    void OP_LD_SP_HL();
+    void OP_PUSH_r(uint8_t xx);
+    void OP_POP_r(uint8_t xx);
+    void OP_LD_HL_SP_offset();
+    void OP_ADD_SP();
+    void OP_DI();
+    void OP_EI();
+    void OP_ADD_A_imm();
+    void OP_ADC_A_imm();
+    void OP_SUB_A_imm();
+    void OP_SBC_A_imm();
+    void OP_AND_A_imm();
+    void OP_OR_A_imm();
+    void OP_XOR_A_imm();
+    void OP_CP_A_imm();
+    void OP_JP();
+    void OP_JP_HL();
+    void OP_JP_test(uint8_t xx);
+    void OP_CALL();
+    void OP_CALL_test(uint8_t xx);
+    void OP_RET();
+    void OP_RET_test(uint8_t xx);
+    void OP_RETI();
+
 
 public:
     //graphics

@@ -128,7 +128,14 @@ class gb {
     void CB_BIT(uint8_t bbb, uint8_t xxx);
     void CB_SET(uint8_t bbb, uint8_t xxx);
     void CB_RES(uint8_t bbb, uint8_t xxx);
+    //helper functions for memory IO.
+    //makes it much easier to go back and add banking
+    //for now will be basic
+    void write_mem(uint16_t address, uint8_t value);
+    uint8_t read_mem(uint16_t address);
 
+    //helper functions for registers
+    uint8_t * decode_register(uint8_t xxx);
 
 
 public:

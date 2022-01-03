@@ -40,6 +40,7 @@ gb::gb()
 
 void gb::LoadROM(const char *filename)
 {
+    //todo: add banking capability
     //open file as binary stream and move file pointer to end
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
 
@@ -611,6 +612,47 @@ void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
 
 void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
 
+}
+
+void gb::write_mem(uint16_t address, uint8_t value) {
+    memory[address] = value;
+}
+
+uint8_t gb::read_mem(uint16_t address) {
+    return memory[address];
+}
+
+uint8_t *gb::decode_register(uint8_t xxx) {
+    switch (xxx)
+    {
+        case 0:
+            return &B;
+            break;
+        case 1:
+            return &C;
+            break;
+        case 2:
+            return &D;
+            break;
+        case 3:
+            return &E;
+            break;
+        case 4:
+            return &H;
+            break;
+        case 5:
+            return &L;
+            break;
+        case 6:
+            return nullptr;
+            break;
+        case 7:
+            return  &A;
+            break;
+        default:
+            return nullptr;
+            break;
+    }
 }
 
 

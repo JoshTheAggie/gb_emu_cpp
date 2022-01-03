@@ -15,7 +15,7 @@ const unsigned int VIDEO_HEIGHT = 144;
 
 class gb {
     uint8_t opcode;          //8-bit instructions
-    uint8_t memory [8192]{};    //8KiB of memory
+    uint8_t memory [0x10000]{};    //64KiB of memory
     /*
   0000-3FFF   16KB ROM Bank 00     (in cartridge, fixed at bank 00)
   4000-7FFF   16KB ROM Bank 01..NN (in cartridge, switchable bank number)
@@ -116,6 +116,19 @@ class gb {
     void OP_RET();
     void OP_RET_test(uint8_t xx);
     void OP_RETI();
+    //CB instructions
+    void CB_RLC(uint8_t xxx);
+    void CB_RL(uint8_t xxx);
+    void CB_RRC(uint8_t xxx);
+    void CB_RR(uint8_t xxx);
+    void CB_SLA(uint8_t xxx);
+    void CB_SRA(uint8_t xxx);
+    void CB_SWAP(uint8_t xxx);
+    void CB_SRL(uint8_t xxx);
+    void CB_BIT(uint8_t bbb, uint8_t xxx);
+    void CB_SET(uint8_t bbb, uint8_t xxx);
+    void CB_RES(uint8_t bbb, uint8_t xxx);
+
 
 
 public:

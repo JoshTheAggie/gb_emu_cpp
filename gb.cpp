@@ -19,17 +19,15 @@ gb::gb()
 
     if(file.is_open())
     {
-        //get size of file and allocate a buffer to hold the contents
-        std::streampos size = file.tellg();
-        char* buffer = new char[size];
+        char* buffer = new char[256];
 
         //go back to beginning of file and fill buffer
         file.seekg(0, std::ios::beg);
-        file.read(buffer, size);
+        file.read(buffer, 256);
         file.close();
 
         //load ROM contents into the gb's memory, starting at 0x0
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < 256; i++)
         {
             memory[i] = buffer[i];
         }
@@ -81,15 +79,43 @@ void gb::Cycle() {
         switch ((opcode & 0xF0u) >> 6)
         {
             case 0: //00
+                switch(get_bits_3_5(opcode))
+                {
+                    case 0:
+                        CB_RLC(get_bits_0_2(opcode));
+                        break;
+                    case 1:
+                        CB_RRC(get_bits_0_2(opcode));
+                        break;
+                    case 2:
+                        CB_RL(get_bits_0_2(opcode));
+                        break;
+                    case 3:
+                        CB_RR(get_bits_0_2(opcode));
+                        break;
+                    case 4:
+                        CB_SLA(get_bits_0_2(opcode));
+                        break;
+                    case 5:
+                        CB_SRA(get_bits_0_2(opcode));
+                        break;
+                    case 6:
+                        CB_SWAP(get_bits_0_2(opcode));
+                        break;
+                    case 7:
+                        CB_SRL(get_bits_0_2(opcode));
+                        break;
+                }
                 break;
             case 1: //01
+                CB_BIT(get_bits_3_5(opcode), get_bits_0_2(opcode));
                 break;
             case 2: //10
+                CB_RES(get_bits_3_5(opcode), get_bits_0_2(opcode));
                 break;
             case 3: //11
+                CB_SET(get_bits_3_5(opcode), get_bits_0_2(opcode));
                 break;
-            default:
-                OP_NOP();
         }
         CB_instruction = false;
     }
@@ -278,8 +304,6 @@ void gb::Cycle() {
                             break;
                     }
                 break;
-            default:
-                OP_NOP();
         }
     //todo: double check that this is correct operation of DI and EI
     if (enable_interrupts)
@@ -304,5 +328,289 @@ void gb::Joypad() {
         memory[0xFF00] = (memory[0xFF00] & 0xF0) + (buttons & 0x0F);
     }
 }
-//todo: Opcode implementations here
+
+void gb::set_Z(bool condition) {
+    if(condition)
+        F = F | 0x80;
+    else
+        F = F & 0x7F;
+}
+
+void gb::set_N(bool condition) {
+    if(condition)
+        F = F | 0x40; //0100
+    else
+        F = F & 0xBF; //1011
+}
+
+void gb::set_H(bool condition) {
+    if(condition)
+        F = F | 0x20; //0010
+    else
+        F = F & 0xDF; //1101
+}
+
+void gb::set_C(bool condition) {
+    if(condition)
+        F = F | 0x10;
+    else
+        F = F & 0xEF;
+}
+
+void gb::OP_HALT() {
+
+}
+
+void gb::OP_RST(uint8_t xxx) {
+
+}
+
+void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
+
+}
+
+void gb::OP_LD_imm(uint8_t xxx) {
+
+}
+
+void gb::OP_LD_mem(uint8_t xxx) {
+
+}
+
+void gb::OP_LDH(uint8_t xxx, uint8_t yyy) {
+
+}
+
+void gb::OP_LD_imm16(uint8_t xx) {
+
+}
+
+void gb::OP_STORE_SP() {
+
+}
+
+void gb::OP_INC_r(uint8_t xxx) {
+
+}
+
+void gb::OP_DEC_r(uint8_t xxx) {
+
+}
+
+void gb::OP_ADD16(uint8_t xx) {
+
+}
+
+void gb::OP_INC16(uint8_t xx) {
+
+}
+
+void gb::OP_DEC16(uint8_t xx) {
+
+}
+
+void gb::OP_DAA() {
+
+}
+
+void gb::OP_CPL() {
+
+}
+
+void gb::OP_CCF() {
+
+}
+
+void gb::OP_SCF() {
+
+}
+
+void gb::OP_STOP() {
+
+}
+
+void gb::OP_rot_shift_A(uint8_t xxx) {
+
+}
+
+void gb::OP_JR() {
+
+}
+
+void gb::OP_JR_test(uint8_t cc) {
+
+}
+
+void gb::OP_ADD_r(uint8_t xxx) {
+
+}
+
+void gb::OP_ADC_r(uint8_t xxx) {
+
+}
+
+void gb::OP_SUB_r(uint8_t xxx) {
+
+}
+
+void gb::OP_SBC_r(uint8_t xxx) {
+
+}
+
+void gb::OP_AND_r(uint8_t xxx) {
+
+}
+
+void gb::OP_OR_r(uint8_t xxx) {
+
+}
+
+void gb::OP_XOR_r(uint8_t xxx) {
+
+}
+
+void gb::OP_CP_r(uint8_t xxx) {
+
+}
+
+void gb::OP_LD_mem16(uint8_t xxx, uint8_t yyy) {
+
+}
+
+void gb::OP_LD_SP_HL() {
+
+}
+
+void gb::OP_PUSH_r(uint8_t xx) {
+
+}
+
+void gb::OP_POP_r(uint8_t xx) {
+
+}
+
+void gb::OP_LD_HL_SP_offset() {
+
+}
+
+void gb::OP_ADD_SP() {
+
+}
+
+void gb::OP_DI() {
+    disable_interrupts = true;
+}
+
+void gb::OP_EI() {
+    enable_interrupts = true;
+}
+
+void gb::OP_ADD_A_imm() {
+
+}
+
+void gb::OP_ADC_A_imm() {
+
+}
+
+void gb::OP_SUB_A_imm() {
+
+}
+
+void gb::OP_SBC_A_imm() {
+
+}
+
+void gb::OP_AND_A_imm() {
+
+}
+
+void gb::OP_OR_A_imm() {
+
+}
+
+void gb::OP_XOR_A_imm() {
+
+}
+
+void gb::OP_CP_A_imm() {
+
+}
+
+void gb::OP_JP() {
+
+}
+
+void gb::OP_JP_HL() {
+
+}
+
+void gb::OP_JP_test(uint8_t xx) {
+
+}
+
+void gb::OP_CALL() {
+
+}
+
+void gb::OP_CALL_test(uint8_t xx) {
+
+}
+
+void gb::OP_RET() {
+
+}
+
+void gb::OP_RET_test(uint8_t xx) {
+
+}
+
+void gb::OP_RETI() {
+
+}
+
+void gb::CB_RLC(uint8_t xxx) {
+
+}
+
+void gb::CB_RL(uint8_t xxx) {
+
+}
+
+void gb::CB_RRC(uint8_t xxx) {
+
+}
+
+void gb::CB_RR(uint8_t xxx) {
+
+}
+
+void gb::CB_SLA(uint8_t xxx) {
+
+}
+
+void gb::CB_SRA(uint8_t xxx) {
+
+}
+
+void gb::CB_SWAP(uint8_t xxx) {
+
+}
+
+void gb::CB_SRL(uint8_t xxx) {
+
+}
+
+void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
+
+}
+
+void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
+
+}
+
+void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
+
+}
+
 

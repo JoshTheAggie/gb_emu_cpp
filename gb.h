@@ -52,7 +52,17 @@ class gb {
     void set_N(bool condition);
     void set_H(bool condition);
     void set_C(bool condition);
+    uint8_t get_C() const;
 
+    //getter for 16-bit regs
+    uint16_t HL() const;
+    uint16_t BC() const;
+    uint16_t DE() const;
+    void inc_HL();
+    void dec_HL();
+    void write_HL(uint16_t value);
+    void write_BC(uint16_t value);
+    void write_DE(uint16_t value);
 
     //helper functions
     static uint8_t get_bits_0_2(uint8_t op){ return (op & 0x07); };
@@ -61,14 +71,14 @@ class gb {
     static uint8_t get_bits_3_4(uint8_t op){ return (op & 0x18) >> 3; };
     static bool isbiton(uint8_t num, uint8_t testbyte){ return ((0x01 << num) & testbyte) != 0x0;};
 
-    void OP_NOP(){ /*todo: insert 1 cycle delay*/ };
+    void OP_NOP(){ cycle_delay(1); };
     void OP_HALT();
     void OP_RST(uint8_t xxx);
     //todo: organize this list
     void OP_LD(uint8_t xxx, uint8_t yyy);
     void OP_LD_imm(uint8_t xxx);
     void OP_LD_mem(uint8_t xxx);
-    void OP_LDH(uint8_t xxx, uint8_t yyy);
+    void OP_LDH(uint8_t yyy);
     void OP_LD_imm16(uint8_t xx);
     void OP_STORE_SP();
     void OP_INC_r(uint8_t xxx);
@@ -136,6 +146,9 @@ class gb {
 
     //helper functions for registers
     uint8_t * decode_register(uint8_t xxx);
+
+    //helper function for timing
+    void cycle_delay(uint8_t cycles);
 
 
 public:

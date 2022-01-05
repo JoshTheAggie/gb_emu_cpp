@@ -420,7 +420,7 @@ void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
         delay = 2;
     }
     if (yyy != 0x6)
-        source = decode_register(xxx);
+        source = decode_register(yyy);
     else {
         source = &memory[HL()];
         delay = 2;

@@ -9,9 +9,17 @@ gb::gb()
     //initialize PC
     PC = 0x0u;
     CB_instruction = false;
+    IME = false;
+    enable_interrupts = false;
+    disable_interrupts = false;
+    opcode = 0;
 
     //todo: initialize all register values that have a fixed value
     memory[0xFF00] |= 0xFF;
+    write_mem(0xFF00, 0xFF); //P1 register - controller
+    write_mem(0xFF0F, 0xE0); //IF register - interrupts
+    write_mem(0xFFFF, 0x00); //IE register - interrupts
+    SP = 0xFFFE;
 
     //load boot rom
     //open file as binary stream and move file pointer to end
@@ -245,7 +253,7 @@ void gb::Cycle() {
                         case 2:
                             if (isbiton(5, opcode)) {
                                 if (isbiton(3, opcode))
-                                    OP_LD_mem16(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                                    OP_LD_mem16();
                                 else
                                     OP_LDH(get_bits_0_2(opcode));
                             }
@@ -306,15 +314,14 @@ void gb::Cycle() {
                     }
                 break;
         }
-    //todo: double check that this is correct operation of DI and EI
     if (enable_interrupts)
     {
-        interrupts_enabled = true;
+        IME = true;
         enable_interrupts = false;
     }
     if (disable_interrupts)
     {
-        interrupts_enabled = false;
+        IME = false;
         disable_interrupts = false;
     }
 }
@@ -359,11 +366,48 @@ void gb::set_C(bool condition) {
 }
 
 void gb::OP_HALT() {
-//todo: this function
+    //HALT: power down CPU until an interrupt
+    while (read_mem(0xFF0F) == 0) ;
+}
+
+void gb::OP_STOP() {
+    //todo: handle LCD once implemented
+    //STOP: halt CPU and LCD until button press
+    while (isbiton(4, read_mem(0xFF0F))) ;
 }
 
 void gb::OP_RST(uint8_t xxx) {
-//todo: this function
+    uint8_t reset = 0;
+    switch (xxx) {
+        case 0:
+            reset = 0x00;
+            break;
+        case 1:
+            reset = 0x08;
+            break;
+        case 2:
+            reset = 0x10;
+            break;
+        case 3:
+            reset = 0x18;
+            break;
+        case 4:
+            reset = 0x20;
+            break;
+        case 5:
+            reset = 0x28;
+            break;
+        case 6:
+            reset = 0x30;
+            break;
+        case 7:
+            reset = 0x38;
+            break;
+        default:
+            break;
+    }
+    PC = reset;
+    cycle_delay(8);
 }
 
 void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
@@ -533,47 +577,135 @@ void gb::OP_DEC_r(uint8_t xxx) {
 }
 
 void gb::OP_ADD16(uint8_t xx) {
-//todo: this function
+    //ADD HL, n
+    switch (xx) {
+        case 0:
+            write_HL(HL() + BC());
+            break;
+        case 1:
+            write_HL(HL() + DE());
+            break;
+        case 2:
+            write_HL(HL() + HL());
+            break;
+        case 3:
+            write_HL(HL() + SP);
+            break;
+        default:
+            break;
+    }
+    cycle_delay(2);
 }
 
 void gb::OP_INC16(uint8_t xx) {
-//todo: this function
+    //INC nn
+    switch (xx) {
+        case 0:
+            write_BC(BC() + 1);
+            break;
+        case 1:
+            write_DE(DE() + 1);
+            break;
+        case 2:
+            write_HL(HL() + 1);
+            break;
+        case 3:
+            SP++;
+            break;
+        default:
+            break;
+    }
+    cycle_delay(2);
 }
 
 void gb::OP_DEC16(uint8_t xx) {
-//todo: this function
+    //DEC nn
+    switch (xx) {
+        case 0:
+            write_BC(BC() - 1);
+            break;
+        case 1:
+            write_DE(DE() - 1);
+            break;
+        case 2:
+            write_HL(HL() - 1);
+            break;
+        case 3:
+            SP--;
+            break;
+        default:
+            break;
+    }
+    cycle_delay(2);
 }
 
 void gb::OP_DAA() {
-//todo: this function
+    //DAA decimal adjust A (BCD format)
+    uint8_t ones = A;
+    uint8_t tens = A/10;
+    ones %= 10;
+    A = (tens << 4) + ones;
+    set_Z(A == 0);
+    set_H(false);
+    set_C(tens > 9);
+    cycle_delay(1);
 }
 
 void gb::OP_CPL() {
-//todo: this function
+    A = ~A;
+    cycle_delay(1);
 }
 
 void gb::OP_CCF() {
-//todo: this function
+    //complement carry flag
+    if (get_C() == 1)
+        set_C(false);
+    else
+        set_C(true);
+    set_H(false);
+    set_N(false);
+    cycle_delay(1);
 }
 
 void gb::OP_SCF() {
-//todo: this function
-}
-
-void gb::OP_STOP() {
-//todo: this function
+    //set carry flag
+    set_C(true);
+    set_H(false);
+    set_N(false);
+    cycle_delay(1);
 }
 
 void gb::OP_rot_shift_A(uint8_t xxx) {
-//todo: this function
-}
-
-void gb::OP_JR() {
-//todo: this function
-}
-
-void gb::OP_JR_test(uint8_t cc) {
-//todo: this function
+    // 000 RLCA, 001 RRCA, 010 RLA, 011 RRA
+    uint16_t newA = 0;
+    switch (xxx) {
+        case 0:
+            //RLCA
+            newA = A << 1;
+            set_C((newA >> 8) == 1);
+            break;
+        case 1:
+            //RRCA
+            newA = A >> 1;
+            set_C(isbiton(0, A));
+            break;
+        case 2:
+            //RLA
+            newA = A << 1;
+            newA += get_C();
+            set_C((newA >> 8) == 1);
+            break;
+        case 3:
+            //RRA
+            newA = A >> 1;
+            newA += (get_C() << 7);
+            set_C(isbiton(0, A));
+            break;
+        default:
+            break;
+    }
+    A = newA;
+    cycle_delay(1);
 }
 
 void gb::OP_ADD_r(uint8_t xxx) {
@@ -665,8 +797,20 @@ void gb::OP_CP_r(uint8_t xxx) {
     cycle_delay(delay);
 }
 
-void gb::OP_LD_mem16(uint8_t xxx, uint8_t yyy) {
-//todo: this function
+void gb::OP_LD_mem16() {
+    uint16_t address;
+    address = read_mem(PC++);
+    address += (read_mem(PC++) << 8);
+    if (isbiton(4, opcode)){
+        //destination is A
+        A = read_mem(address);
+    }
+    else
+    {
+        //destination is mem
+        write_mem(address, A);
+    }
+    cycle_delay(4);
 }
 
 void gb::OP_LD_SP_HL() {
@@ -749,119 +893,447 @@ void gb::OP_EI() {
 }
 
 void gb::OP_ADD_A_imm() {
-//todo: this function
+    A += read_mem(PC++);
+    cycle_delay(2);
 }
 
 void gb::OP_ADC_A_imm() {
-//todo: this function
+    A += read_mem(PC++) + get_C();
+    cycle_delay(2);
 }
 
 void gb::OP_SUB_A_imm() {
-//todo: this function
+    A -= read_mem(PC++);
+    cycle_delay(2);
 }
 
 void gb::OP_SBC_A_imm() {
-//todo: this function
+    A -= read_mem(PC++) - get_C();
+    cycle_delay(2);
 }
 
 void gb::OP_AND_A_imm() {
-//todo: this function
+    A &= read_mem(PC++);
+    cycle_delay(2);
 }
 
 void gb::OP_OR_A_imm() {
-//todo: this function
+    A |= read_mem(PC++);
+    cycle_delay(2);
 }
 
 void gb::OP_XOR_A_imm() {
-//todo: this function
+    A ^= read_mem(PC++);
+    cycle_delay(2);
 }
 
 void gb::OP_CP_A_imm() {
-//todo: this function
+    uint8_t compare_val = A;
+    compare_val -= read_mem(PC++);
+    cycle_delay(2);
 }
 
 void gb::OP_JP() {
-//todo: this function
+    uint16_t address;
+    address = read_mem(PC++);
+    address += (read_mem(PC++) << 8);
+    PC = address;
+    cycle_delay(4);
 }
 
 void gb::OP_JP_HL() {
-//todo: this function
+    PC = HL();
+    cycle_delay(1);
 }
 
 void gb::OP_JP_test(uint8_t xx) {
-//todo: this function
+    uint8_t delay = 3;
+    uint16_t address;
+    address = read_mem(PC++);
+    address += (read_mem(PC++) << 8);
+    if(test_condition(xx)){
+        PC = address;
+        delay++;
+    }
+    cycle_delay(delay);
+}
+
+void gb::OP_JR() {
+    uint16_t offset = read_mem(PC++);
+    if (isbiton(7, offset)) offset += 0xFF00;
+    PC = PC + offset;
+    cycle_delay(3);
+}
+
+void gb::OP_JR_test(uint8_t cc) {
+    uint8_t delay = 2;
+    uint16_t offset = read_mem(PC++);
+    if (isbiton(7, offset)) offset += 0xFF00;
+    if(test_condition(cc)){
+        PC = PC + offset;
+        delay++;
+    }
+    cycle_delay(delay);
 }
 
 void gb::OP_CALL() {
-//todo: this function
+    uint16_t address;
+    address = read_mem(PC++);
+    address += (read_mem(PC++) << 8);
+    SP--;
+    write_mem(SP--, (PC >> 8));
+    write_mem(SP, (PC & 0xFF));
+    PC = address;
+    cycle_delay(6);
 }
 
 void gb::OP_CALL_test(uint8_t xx) {
-//todo: this function
+    uint8_t delay = 3;
+    uint16_t address;
+    address = read_mem(PC++);
+    address += (read_mem(PC++) << 8);
+    if(test_condition(xx)) {
+        SP--;
+        write_mem(SP--, (PC >> 8));
+        write_mem(SP, (PC & 0xFF));
+        PC = address;
+        delay += 3;
+    }
+    cycle_delay(delay);
 }
 
 void gb::OP_RET() {
-//todo: this function
+    uint16_t newPC = read_mem(SP++);
+    newPC += (read_mem(SP++) << 8);
+    PC = newPC;
+    cycle_delay(4);
 }
 
 void gb::OP_RET_test(uint8_t xx) {
-//todo: this function
+    uint8_t delay = 2;
+    if(test_condition(xx))
+    {
+        delay += 3;
+        uint16_t newPC = read_mem(SP++);
+        newPC += (read_mem(SP++) << 8);
+        PC = newPC;
+    }
+    cycle_delay(delay);
 }
 
 void gb::OP_RETI() {
-//todo: this function
+    uint16_t newPC = read_mem(SP++);
+    newPC += (read_mem(SP++) << 8);
+    PC = newPC;
+    IME = true;
+    cycle_delay(4);
 }
 
 void gb::CB_RLC(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+
+        tempHi = temp << 1;
+        temp = temp >> 7;
+        result = temp + tempHi;
+
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+
+        tempHi = temp << 1;
+        temp = temp >> 7;
+        result = temp + tempHi;
+
+        *reg = result;
+    }
+    set_C(temp == 1);
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_RL(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+
+        tempHi = temp << 1;
+        temp = temp >> 7;
+        result = temp + get_C();
+
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+
+        tempHi = temp << 1;
+        temp = temp >> 7;
+        result = temp + get_C();
+
+        *reg = result;
+    }
+    set_C(temp == 1);
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_RRC(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+
+        tempHi = temp << 7;
+        temp = temp >> 1;
+        result = temp + tempHi;
+
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+
+        tempHi = temp << 7;
+        temp = temp >> 1;
+        result = temp + tempHi;
+
+        *reg = result;
+    }
+    set_C(tempHi != 0);
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_RR(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+
+        tempHi = temp << 7;
+        temp = temp >> 1;
+        result = temp + (get_C() << 7);
+
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+
+        tempHi = temp << 7;
+        temp = temp >> 1;
+        result = temp + (get_C() << 7);
+
+        *reg = result;
+    }
+    set_C(tempHi != 0);
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_SLA(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+
+        result = temp << 1;
+
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+
+        result = temp << 1;
+
+        *reg = result;
+    }
+    set_C(isbiton(7, temp));
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_SRA(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+
+        result = temp >> 1;
+        if (isbiton(7, temp))
+            result += 0x80;
+
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+
+        result = temp >> 1;
+        if (isbiton(7, temp))
+            result += 0x80;
+
+        *reg = result;
+    }
+    set_C(isbiton(0, temp));
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_SWAP(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+        tempHi = temp << 4;
+        temp = temp >> 4;
+        result = temp + tempHi;
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+        tempHi = temp << 4;
+        temp = temp >> 4;
+        result = temp + tempHi;
+        *reg = result;
+    }
+    set_C(false);
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_SRL(uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp, tempHi, result;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+
+        result = temp >> 1;
+
+        write_mem(HL(), result);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+
+        result = temp >> 1;
+
+        *reg = result;
+    }
+    set_C(isbiton(0, temp));
+    set_H(false);
+    set_N(false);
+    set_Z(result == 0);
+    cycle_delay(delay);
 }
 
 void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+    }
+    set_H(true);
+    set_N(false);
+    set_Z(isbiton(bbb, temp));
+    cycle_delay(delay);
 }
 
 void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+        temp |= (0x01 << bbb);
+        write_mem(HL(), temp);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+        temp |= (0x01 << bbb);
+        *reg = temp;
+    }
+    //flags are not affected here
+    cycle_delay(delay);
 }
 
 void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
-//todo: this function
+    uint8_t delay = 2;
+    uint8_t temp;
+    uint8_t * reg = decode_register(xxx);
+    if (xxx == 0x06) {
+        temp = read_mem(HL());
+        temp &= ~(0x01 << bbb);
+        write_mem(HL(), temp);
+        delay = 4;
+    }
+    else {
+        temp = *reg;
+        temp &= ~(0x01 << bbb);
+        *reg = temp;
+    }
+    //flags are not affected here
+    cycle_delay(delay);
 }
 
 void gb::write_mem(uint16_t address, uint8_t value) {
+    //todo: go back and actually use these
     memory[address] = value;
 }
 
 uint8_t gb::read_mem(uint16_t address) {
-    return memory[address];
+    //todo: go back and actually use these
+    if (address == 0xFF00){
+        //joypad register
+        if(!isbiton(5, memory[0xFF00]))
+        {
+            //action buttons selected
+            return ((memory[0xFF00] & 0xF0) | (buttons & 0x0F));
+        }
+        if(!isbiton(4, memory[0xFF00]))
+        {
+            //direction buttons selected
+            return ((memory[0xFF00] & 0xF0) | (directions & 0x0F));
+        }
+    }
+    else
+        return memory[address];
 }
 
 uint8_t *gb::decode_register(uint8_t xxx) {
@@ -889,7 +1361,12 @@ uint8_t *gb::decode_register(uint8_t xxx) {
 }
 
 void gb::cycle_delay(uint8_t cycles) {
-    //todo: incorporate delay based on number of cycles
+    cycles_ran += cycles;
+    if (cycles_ran >= 4194) //approximately the number of cycles in 1 ms (4194.304)
+    {
+        cycles_ran = 0;
+        SDL_Delay(1);
+    }
 }
 
 uint16_t gb::HL() const {
@@ -935,6 +1412,31 @@ void gb::write_DE(uint16_t value) {
 
 uint8_t gb::get_C() const {
     return ((F & 0x10) >> 4);
+}
+
+bool gb::test_condition(uint8_t cc) const {
+    bool test;
+    switch (cc) {
+        case 0:
+            //NZ
+            test = !isbiton(7, F);
+            break;
+        case 1:
+            //NC
+            test = !isbiton(4, F);
+            break;
+        case 2:
+            //Z
+            test = isbiton(7, F);
+            break;
+        case 3:
+            //C
+            test = isbiton(4, F);
+            break;
+        default:
+            break;
+    }
+    return test;
 }
 
 

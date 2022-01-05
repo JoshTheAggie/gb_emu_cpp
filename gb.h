@@ -4,7 +4,8 @@
 
 #include <cstdint>
 #include <fstream>
-#include <string.h>
+#include <string>
+#include <SDL2/SDL.h>
 
 #ifndef GBEMUJM_GB_H
 #define GBEMUJM_GB_H
@@ -14,6 +15,8 @@ const unsigned int VIDEO_WIDTH = 160;
 const unsigned int VIDEO_HEIGHT = 144;
 
 class gb {
+    //used for CPU speed regulation
+    uint32_t cycles_ran = 0;
     uint8_t opcode;          //8-bit instructions
     uint8_t memory [0x10000]{};    //64KiB of memory
     /*
@@ -43,7 +46,7 @@ class gb {
     uint16_t SP{};              //16-bit stack pointer
 
     bool CB_instruction;
-    bool interrupts_enabled;
+    bool IME;
     bool enable_interrupts;
     bool disable_interrupts;
 
@@ -102,7 +105,7 @@ class gb {
     void OP_OR_r(uint8_t xxx);
     void OP_XOR_r(uint8_t xxx);
     void OP_CP_r(uint8_t xxx);
-    void OP_LD_mem16(uint8_t xxx, uint8_t yyy);
+    void OP_LD_mem16();
     void OP_LD_SP_HL();
     void OP_PUSH_r(uint8_t xx);
     void OP_POP_r(uint8_t xx);
@@ -149,6 +152,8 @@ class gb {
 
     //helper function for timing
     void cycle_delay(uint8_t cycles);
+    //helper function for conditional testing
+    bool test_condition(uint8_t cc) const;
 
 
 public:

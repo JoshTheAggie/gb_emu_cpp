@@ -4,8 +4,6 @@
 #include "gb.h"
 #include "platform.h"
 
-gb cpu;
-
 int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM name
     if(argc != 4)
     {

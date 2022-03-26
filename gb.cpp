@@ -75,6 +75,9 @@ void gb::LoadROM(const char *filename)
 }
 
 void gb::Cycle() {
+
+    //TODO: handle interrupts before doing any of this!!!
+
     //fetch instruction
     opcode = memory[PC];
     //output for debug

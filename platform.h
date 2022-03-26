@@ -12,7 +12,7 @@ class Platform {
     sf::Texture* texture{};
     sf::Sprite* sprite{};
 public:
-    Platform(char const* title, int windowWidth, int windowHeight, int textureWidth, int textureHeight, int scale)
+    Platform(char const* title, unsigned int windowWidth, unsigned int windowHeight, unsigned int textureWidth, unsigned int textureHeight, int scale)
     {
         window = new sf::RenderWindow(sf::VideoMode(windowWidth, windowHeight), title);
         window->clear();

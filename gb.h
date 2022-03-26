@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
-#include <SDL2/SDL.h>
+#include <SFML/System/Clock.hpp>
 
 #ifndef GBEMUJM_GB_H
 #define GBEMUJM_GB_H
@@ -15,6 +15,7 @@ const unsigned int VIDEO_WIDTH = 160;
 const unsigned int VIDEO_HEIGHT = 144;
 
 class gb {
+    sf::Clock clock;
     //used for CPU speed regulation
     uint32_t cycles_ran = 0;
     uint8_t opcode;          //8-bit instructions

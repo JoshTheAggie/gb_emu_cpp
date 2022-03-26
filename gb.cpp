@@ -1364,8 +1364,9 @@ void gb::cycle_delay(uint8_t cycles) {
     cycles_ran += cycles;
     if (cycles_ran >= 4194) //approximately the number of cycles in 1 ms (4194.304)
     {
+        clock.restart();
         cycles_ran = 0;
-        SDL_Delay(1);
+        while(clock.getElapsedTime().asMilliseconds() < 1); //yep, just NOP
     }
 }
 

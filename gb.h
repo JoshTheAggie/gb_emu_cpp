@@ -20,6 +20,8 @@ class gb {
     uint32_t cycles_ran = 0;
     uint8_t opcode;          //8-bit instructions
     uint8_t memory [0x10000]{};    //64KiB of memory
+    uint8_t bootrom [256]{}; //256 byte bootstrap
+    uint8_t cartridge_rom [0x200000]{}; //cartridge rom
     /*
   0000-3FFF   16KB ROM Bank 00     (in cartridge, fixed at bank 00)
   4000-7FFF   16KB ROM Bank 01..NN (in cartridge, switchable bank number)
@@ -51,6 +53,9 @@ class gb {
     bool enable_interrupts;
     bool disable_interrupts;
 
+    bool any_interrupts();
+    void request_interrupt(uint8_t irq_num);
+
     //getter and setters for flags
     void set_Z(bool condition);
     void set_N(bool condition);
@@ -62,11 +67,13 @@ class gb {
     uint16_t HL() const;
     uint16_t BC() const;
     uint16_t DE() const;
+    uint16_t AF() const;
     void inc_HL();
     void dec_HL();
     void write_HL(uint16_t value);
     void write_BC(uint16_t value);
     void write_DE(uint16_t value);
+    void write_AF(uint16_t value);
 
     //helper functions
     static uint8_t get_bits_0_2(uint8_t op){ return (op & 0x07); };

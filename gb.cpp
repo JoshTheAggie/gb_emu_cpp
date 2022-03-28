@@ -15,10 +15,10 @@ gb::gb()
     opcode = 0;
 
     //todo: initialize all register values that have a fixed value
-    memory[0xFF00] |= 0xFF;
     write_mem(0xFF00, 0xFF); //P1 register - controller
     write_mem(0xFF0F, 0xE0); //IF register - interrupts
     write_mem(0xFFFF, 0x00); //IE register - interrupts
+    write_mem(0xFF50, 0x00); // if nonzero, bootrom is disabled
     SP = 0xFFFE;
 
     //load boot rom
@@ -37,7 +37,7 @@ gb::gb()
         //load ROM contents into the gb's memory, starting at 0x0
         for (int i = 0; i < 256; i++)
         {
-            memory[i] = buffer[i];
+            bootrom[i] = buffer[i];
         }
 
         //free the buffer
@@ -63,280 +63,299 @@ void gb::LoadROM(const char *filename)
         file.read(buffer, size);
         file.close();
 
-        //load ROM contents into the gb's memory, starting at 0x100
+        //load ROM contents into the gb's memory, starting at 0x00
         for (int i = 0; i < size; i++)
         {
-            memory[START_ADDRESS + i] = buffer[i];
+            cartridge_rom[i] = buffer[i];
         }
 
         //free the buffer
         delete[] buffer;
+
+        //copy the first 0x8000 bytes into RAM
+        for (int i = 0; i < size; i++)
+        {
+            memory[i] = cartridge_rom[i];
+        }
     }
+}
+
+bool gb::any_interrupts() {
+    //checks for and handles interrupts
+    if(!IME) return false;
+    else{
+        uint8_t interrupts = read_mem(0xFFFF) & read_mem(0xFF0F);
+        if(interrupts != 0){
+            IME = false; //disable further interrupts
+            uint16_t address;
+            if(isbiton(0, interrupts)) address = 0x0040; //Vblank
+            else if(isbiton(1, interrupts)) address = 0x0048; //LCD STAT
+            else if(isbiton(2, interrupts)) address = 0x0050; //Timer
+            else if(isbiton(3, interrupts)) address = 0x0058; //Serial
+            else if(isbiton(4, interrupts)) address = 0x0060; //Joypad
+            // jump to interrupt handler
+            SP--;
+            write_mem(SP--, (PC >> 8));
+            write_mem(SP, (PC & 0xFF));
+            PC = address;
+            cycle_delay(5); //pandocs speculates this is correct
+            return true;
+        }
+        else return false;
+    }
+
+}
+
+void gb::request_interrupt(uint8_t irq_num) {
+    memory[0xFF0F] |= (0x01 << irq_num);
 }
 
 void gb::Cycle() {
 
-    //TODO: handle interrupts before doing any of this!!!
+    //TODO: ensure interrupt handler works
+    if(!any_interrupts()) {
+        //fetch instruction
+        opcode = read_mem(PC);
+        //output for debug
+        std::printf("pc: %x\topcode: %x\n", PC, opcode);
 
-    //fetch instruction
-    opcode = memory[PC];
-    //output for debug
-    std::printf("pc: %x\topcode: %x\n", PC, opcode);
+        //increment pc before doing anything
+        PC++;
 
-    //increment pc before doing anything
-    PC++;
-
-    if (CB_instruction)
-    {
-        switch ((opcode & 0xF0u) >> 6)
-        {
-            case 0: //00
-                switch(get_bits_3_5(opcode))
-                {
-                    case 0:
-                        CB_RLC(get_bits_0_2(opcode));
-                        break;
-                    case 1:
-                        CB_RRC(get_bits_0_2(opcode));
-                        break;
-                    case 2:
-                        CB_RL(get_bits_0_2(opcode));
-                        break;
-                    case 3:
-                        CB_RR(get_bits_0_2(opcode));
-                        break;
-                    case 4:
-                        CB_SLA(get_bits_0_2(opcode));
-                        break;
-                    case 5:
-                        CB_SRA(get_bits_0_2(opcode));
-                        break;
-                    case 6:
-                        CB_SWAP(get_bits_0_2(opcode));
-                        break;
-                    case 7:
-                        CB_SRL(get_bits_0_2(opcode));
-                        break;
-                }
-                break;
-            case 1: //01
-                CB_BIT(get_bits_3_5(opcode), get_bits_0_2(opcode));
-                break;
-            case 2: //10
-                CB_RES(get_bits_3_5(opcode), get_bits_0_2(opcode));
-                break;
-            case 3: //11
-                CB_SET(get_bits_3_5(opcode), get_bits_0_2(opcode));
-                break;
-        }
-        CB_instruction = false;
-    }
-    else
-        switch ((opcode & 0xF0u) >> 6)
-        {
-            case 0: //00
-                switch (opcode & 0x07)
-                {
-                    case 0:
-                        if (opcode == 0x08) OP_STORE_SP();
-                        else if (opcode == 0x10) OP_STOP();
-                        else if (opcode == 0x18) OP_JR();
-                        else if (isbiton(5, opcode)) OP_JR_test(get_bits_3_4(opcode));
-                        else OP_NOP();
-                        break;
-                    case 1:
-                        if (isbiton(3, opcode)) OP_ADD16(get_bits_4_5(opcode));
-                        else OP_LD_imm16(get_bits_4_5(opcode));
-                        break;
-                    case 2:
-                        OP_LD_mem(get_bits_3_5(opcode));
-                        break;
-                    case 3:
-                        if (isbiton(3, opcode)) OP_DEC16(get_bits_4_5(opcode));
-                        else OP_INC16(get_bits_4_5(opcode));
-                            break;
-                    case 4:
-                        OP_INC_r(get_bits_3_5(opcode));
-                        break;
-                    case 5:
-                        OP_DEC_r(get_bits_3_5(opcode));
-                        break;
-                    case 6:
-                        OP_LD_imm(get_bits_3_5(opcode));
-                        break;
-                    case 7:
-                        if(isbiton(5, opcode))
-                        {
-                            if(opcode == 0x27) OP_DAA();
-                            else if (opcode == 0x2F) OP_CPL();
-                            else if (opcode == 0x3F) OP_CCF();
-                            else if (opcode == 0x37) OP_SCF();
-                        }
-                        else
-                            OP_rot_shift_A(get_bits_3_5(opcode));
-                        break;
-                }
-                break;
-            case 1: //01
-                if(opcode == 0x76) OP_HALT();
-                else OP_LD(get_bits_3_5(opcode), get_bits_0_2(opcode));
-                break;
-            case 2: //10
-                switch (get_bits_3_5(opcode))
-                {
-                    case 0:
-                        OP_ADD_r(get_bits_0_2(opcode));
-                        break;
-                    case 1:
-                        OP_ADC_r(get_bits_0_2(opcode));
-                        break;
-                    case 2:
-                        OP_SUB_r(get_bits_0_2(opcode));
-                        break;
-                    case 3:
-                        OP_SBC_r(get_bits_0_2(opcode));
-                        break;
-                    case 4:
-                        OP_AND_r(get_bits_0_2(opcode));
-                        break;
-                    case 5:
-                        OP_OR_r(get_bits_0_2(opcode));
-                        break;
-                    case 6:
-                        OP_XOR_r(get_bits_0_2(opcode));
-                        break;
-                    case 7:
-                        OP_CP_r(get_bits_0_2(opcode));
-                        break;
-                }
-                break;
-            case 3: //11
-                if (opcode == 0xCB) {
-                    cycle_delay(1);
-                    CB_instruction = true;
-                }
-                else
-                    switch (get_bits_0_2(opcode)) {
+        if (CB_instruction) {
+            switch ((opcode & 0xF0u) >> 6) {
+                case 0: //00
+                    switch (get_bits_3_5(opcode)) {
                         case 0:
-                            if (isbiton(5, opcode))
-                            {
-                                if (isbiton(3, opcode)) {
-                                    if (isbiton(4, opcode))
-                                        OP_LD_HL_SP_offset();
-                                    else
-                                        OP_ADD_SP();
-                                }
-                                else
-                                    OP_LDH(get_bits_0_2(opcode));
-                            }
-                            else
-                                OP_RET_test(get_bits_3_4(opcode));
+                            CB_RLC(get_bits_0_2(opcode));
                             break;
                         case 1:
-                            switch (get_bits_3_5(opcode)) {
-                                case 1:
-                                    OP_RET();
-                                    break;
-                                case 3:
-                                    OP_RETI();
-                                    break;
-                                case 5:
-                                    OP_JP_HL();
-                                    break;
-                                case 7:
-                                    OP_LD_SP_HL();
-                                    break;
-                                case 0:
-                                case 2:
-                                case 4:
-                                case 6:
-                                    OP_POP_r(get_bits_4_5(opcode));
-                            }
+                            CB_RRC(get_bits_0_2(opcode));
                             break;
                         case 2:
-                            if (isbiton(5, opcode)) {
-                                if (isbiton(3, opcode))
-                                    OP_LD_mem16();
-                                else
-                                    OP_LDH(get_bits_0_2(opcode));
-                            }
-                            else
-                                OP_JP_test(get_bits_3_4(opcode));
+                            CB_RL(get_bits_0_2(opcode));
                             break;
                         case 3:
-                            if (isbiton(4, opcode))
-                            {
-                                if (isbiton(3, opcode))
-                                    OP_EI();
-                                else
-                                    OP_DI();
-                            }
-                            else
-                                OP_JP();
+                            CB_RR(get_bits_0_2(opcode));
                             break;
                         case 4:
-                            OP_CALL_test(get_bits_3_4(opcode));
+                            CB_SLA(get_bits_0_2(opcode));
                             break;
                         case 5:
-                            if (isbiton(3, opcode))
-                                OP_CALL();
-                            else
-                                OP_PUSH_r(get_bits_4_5(opcode));
+                            CB_SRA(get_bits_0_2(opcode));
                             break;
                         case 6:
-                            switch(get_bits_3_5(opcode)){
-                                case 0:
-                                    OP_ADD_A_imm();
-                                    break;
-                                case 1:
-                                    OP_ADC_A_imm();
-                                    break;
-                                case 2:
-                                    OP_SUB_A_imm();
-                                    break;
-                                case 3:
-                                    OP_SBC_A_imm();
-                                    break;
-                                case 4:
-                                    OP_AND_A_imm();
-                                    break;
-                                case 5:
-                                    OP_XOR_A_imm();
-                                    break;
-                                case 6:
-                                    OP_OR_A_imm();
-                                    break;
-                                case 7:
-                                    OP_CP_A_imm();
-                                    break;
-                            }
+                            CB_SWAP(get_bits_0_2(opcode));
                             break;
                         case 7:
-                            OP_RST(get_bits_3_5(opcode));
+                            CB_SRL(get_bits_0_2(opcode));
                             break;
                     }
-                break;
+                    break;
+                case 1: //01
+                    CB_BIT(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                    break;
+                case 2: //10
+                    CB_RES(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                    break;
+                case 3: //11
+                    CB_SET(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                    break;
+            }
+            CB_instruction = false;
+        } else
+            switch ((opcode & 0xF0u) >> 6) {
+                case 0: //00
+                    switch (opcode & 0x07) {
+                        case 0:
+                            if (opcode == 0x08) OP_STORE_SP();
+                            else if (opcode == 0x10) OP_STOP();
+                            else if (opcode == 0x18) OP_JR();
+                            else if (isbiton(5, opcode)) OP_JR_test(get_bits_3_4(opcode));
+                            else OP_NOP();
+                            break;
+                        case 1:
+                            if (isbiton(3, opcode)) OP_ADD16(get_bits_4_5(opcode));
+                            else OP_LD_imm16(get_bits_4_5(opcode));
+                            break;
+                        case 2:
+                            OP_LD_mem(get_bits_3_5(opcode));
+                            break;
+                        case 3:
+                            if (isbiton(3, opcode)) OP_DEC16(get_bits_4_5(opcode));
+                            else OP_INC16(get_bits_4_5(opcode));
+                            break;
+                        case 4:
+                            OP_INC_r(get_bits_3_5(opcode));
+                            break;
+                        case 5:
+                            OP_DEC_r(get_bits_3_5(opcode));
+                            break;
+                        case 6:
+                            OP_LD_imm(get_bits_3_5(opcode));
+                            break;
+                        case 7:
+                            if (isbiton(5, opcode)) {
+                                if (opcode == 0x27) OP_DAA();
+                                else if (opcode == 0x2F) OP_CPL();
+                                else if (opcode == 0x3F) OP_CCF();
+                                else if (opcode == 0x37) OP_SCF();
+                            } else
+                                OP_rot_shift_A(get_bits_3_5(opcode));
+                            break;
+                    }
+                    break;
+                case 1: //01
+                    if (opcode == 0x76) OP_HALT();
+                    else OP_LD(get_bits_3_5(opcode), get_bits_0_2(opcode));
+                    break;
+                case 2: //10
+                    switch (get_bits_3_5(opcode)) {
+                        case 0:
+                            OP_ADD_r(get_bits_0_2(opcode));
+                            break;
+                        case 1:
+                            OP_ADC_r(get_bits_0_2(opcode));
+                            break;
+                        case 2:
+                            OP_SUB_r(get_bits_0_2(opcode));
+                            break;
+                        case 3:
+                            OP_SBC_r(get_bits_0_2(opcode));
+                            break;
+                        case 4:
+                            OP_AND_r(get_bits_0_2(opcode));
+                            break;
+                        case 5:
+                            OP_OR_r(get_bits_0_2(opcode));
+                            break;
+                        case 6:
+                            OP_XOR_r(get_bits_0_2(opcode));
+                            break;
+                        case 7:
+                            OP_CP_r(get_bits_0_2(opcode));
+                            break;
+                    }
+                    break;
+                case 3: //11
+                    if (opcode == 0xCB) {
+                        cycle_delay(1);
+                        CB_instruction = true;
+                    } else
+                        switch (get_bits_0_2(opcode)) {
+                            case 0:
+                                if (isbiton(5, opcode)) {
+                                    if (isbiton(3, opcode)) {
+                                        if (isbiton(4, opcode))
+                                            OP_LD_HL_SP_offset();
+                                        else
+                                            OP_ADD_SP();
+                                    } else
+                                        OP_LDH(get_bits_0_2(opcode));
+                                } else
+                                    OP_RET_test(get_bits_3_4(opcode));
+                                break;
+                            case 1:
+                                switch (get_bits_3_5(opcode)) {
+                                    case 1:
+                                        OP_RET();
+                                        break;
+                                    case 3:
+                                        OP_RETI();
+                                        break;
+                                    case 5:
+                                        OP_JP_HL();
+                                        break;
+                                    case 7:
+                                        OP_LD_SP_HL();
+                                        break;
+                                    case 0:
+                                    case 2:
+                                    case 4:
+                                    case 6:
+                                        OP_POP_r(get_bits_4_5(opcode));
+                                }
+                                break;
+                            case 2:
+                                if (isbiton(5, opcode)) {
+                                    if (isbiton(3, opcode))
+                                        OP_LD_mem16();
+                                    else
+                                        OP_LDH(get_bits_0_2(opcode));
+                                } else
+                                    OP_JP_test(get_bits_3_4(opcode));
+                                break;
+                            case 3:
+                                if (isbiton(4, opcode)) {
+                                    if (isbiton(3, opcode))
+                                        OP_EI();
+                                    else
+                                        OP_DI();
+                                } else
+                                    OP_JP();
+                                break;
+                            case 4:
+                                OP_CALL_test(get_bits_3_4(opcode));
+                                break;
+                            case 5:
+                                if (isbiton(3, opcode))
+                                    OP_CALL();
+                                else
+                                    OP_PUSH_r(get_bits_4_5(opcode));
+                                break;
+                            case 6:
+                                switch (get_bits_3_5(opcode)) {
+                                    case 0:
+                                        OP_ADD_A_imm();
+                                        break;
+                                    case 1:
+                                        OP_ADC_A_imm();
+                                        break;
+                                    case 2:
+                                        OP_SUB_A_imm();
+                                        break;
+                                    case 3:
+                                        OP_SBC_A_imm();
+                                        break;
+                                    case 4:
+                                        OP_AND_A_imm();
+                                        break;
+                                    case 5:
+                                        OP_XOR_A_imm();
+                                        break;
+                                    case 6:
+                                        OP_OR_A_imm();
+                                        break;
+                                    case 7:
+                                        OP_CP_A_imm();
+                                        break;
+                                }
+                                break;
+                            case 7:
+                                OP_RST(get_bits_3_5(opcode));
+                                break;
+                        }
+                    break;
+            }
+        if (enable_interrupts) {
+            IME = true;
+            enable_interrupts = false;
         }
-    if (enable_interrupts)
-    {
-        IME = true;
-        enable_interrupts = false;
-    }
-    if (disable_interrupts)
-    {
-        IME = false;
-        disable_interrupts = false;
+        if (disable_interrupts) {
+            IME = false;
+            disable_interrupts = false;
+        }
     }
 }
 
 void gb::Joypad() {
-    if(!(memory[0xFF00] & 0b00100000)) //if bit 5 is set 0
+    if(!(read_mem(0xFF00) & 0b00100000)) //if bit 5 is set 0
     {
-        memory[0xFF00] = (memory[0xFF00] & 0xF0) + (directions & 0x0F);
+        memory[0xFF00] = (read_mem(0xFF00) & 0xF0) + (directions & 0x0F);
     }
-    else if(!(memory[0xFF00] & 0b00010000)) //if bit 4 is set 0
+    else if(!(read_mem(0xFF00) & 0b00010000)) //if bit 4 is set 0
     {
-        memory[0xFF00] = (memory[0xFF00] & 0xF0) + (buttons & 0x0F);
+        memory[0xFF00] = (read_mem(0xFF00) & 0xF0) + (buttons & 0x0F);
     }
 }
 
@@ -441,7 +460,7 @@ void gb::OP_LD_imm(uint8_t xxx) {
         destination = &memory[HL()];
         delay = 3;
     }
-    uint8_t imm = memory[PC++];
+    uint8_t imm = read_mem(PC++);
     *destination = imm;
     cycle_delay(delay);
 }
@@ -509,13 +528,13 @@ void gb::OP_LDH(uint8_t yyy) {
         address += C;
     else
     {
-        address += memory[PC++];
+        address += read_mem(PC++);
         delay++;
     }
     if (isbiton(4, opcode))
     {
         //destination is A
-        A = memory[address];
+        A = read_mem(address);
     }
     else
     {
@@ -527,8 +546,8 @@ void gb::OP_LDH(uint8_t yyy) {
 
 void gb::OP_LD_imm16(uint8_t xx) {
     uint16_t imm;
-    imm = memory[PC++];
-    imm += (memory[PC++] << 8);
+    imm = read_mem(PC++);
+    imm += (read_mem(PC++) << 8);
     switch (xx)
     {
         case 0:
@@ -550,8 +569,8 @@ void gb::OP_LD_imm16(uint8_t xx) {
 }
 
 void gb::OP_STORE_SP() {
-    uint16_t address = memory[PC++];
-    address += (memory[PC++] << 8);
+    uint16_t address = read_mem(PC++);
+    address += (read_mem(PC++) << 8);
     memory[address] = (SP & 0xFF);
     memory[address+1] = (SP >> 8);
     cycle_delay(5);
@@ -560,38 +579,56 @@ void gb::OP_STORE_SP() {
 void gb::OP_INC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t temp;
     if (xxx == 0x6) {
         delay = 3;
         reg = &memory[HL()];
     }
+    temp = *reg;
     (*reg)++;
+    set_Z(*reg == 0);
+    set_N(false);
+    set_H(((temp & 0xF) + 1) > 0xF);
     cycle_delay(delay);
 }
 
 void gb::OP_DEC_r(uint8_t xxx) {
-    uint8_t delay = 1;
+    uint8_t delay = 1, temp;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x6) {
         delay = 3;
         reg = &memory[HL()];
     }
+    temp = *reg;
     (*reg)--;
+    set_Z(*reg == 0);
+    set_N(true);
+    set_H(((temp & 0xF)) == 0x00);
     cycle_delay(delay);
 }
 
 void gb::OP_ADD16(uint8_t xx) {
     //ADD HL, n
+    set_N(false);
     switch (xx) {
         case 0:
+            set_H(((HL() & 0x0FFF) + (BC() & 0x0FFF)) > 0x0FFF);
+            set_C(((uint32_t)HL() + (uint32_t)BC()) > 0x0000FFFF);
             write_HL(HL() + BC());
             break;
         case 1:
+            set_H(((HL() & 0x0FFF) + (DE() & 0x0FFF)) > 0x0FFF);
+            set_C(((uint32_t)HL() + (uint32_t)DE()) > 0x0000FFFF);
             write_HL(HL() + DE());
             break;
         case 2:
+            set_H(((HL() & 0x0FFF) + (HL() & 0x0FFF)) > 0x0FFF);
+            set_C(((uint32_t)HL() + (uint32_t)HL()) > 0x0000FFFF);
             write_HL(HL() + HL());
             break;
         case 3:
+            set_H(((HL() & 0x0FFF) + (SP & 0x0FFF)) > 0x0FFF);
+            set_C(((uint32_t)HL() + (uint32_t)SP) > 0x0000FFFF);
             write_HL(HL() + SP);
             break;
         default:
@@ -657,6 +694,8 @@ void gb::OP_DAA() {
 void gb::OP_CPL() {
     A = ~A;
     cycle_delay(1);
+    set_N(true);
+    set_H(true);
 }
 
 void gb::OP_CCF() {
@@ -718,7 +757,11 @@ void gb::OP_ADD_r(uint8_t xxx) {
         delay = 2;
         reg = &memory[HL()];
     }
+    set_N(false);
+    set_H((A & 0xF + *reg & 0xF) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)(*reg)) > 0xFF);
     A += *reg;
+    set_Z(A == 0x00);
     cycle_delay(delay);
 }
 
@@ -729,7 +772,11 @@ void gb::OP_ADC_r(uint8_t xxx) {
         delay = 2;
         reg = &memory[HL()];
     }
+    set_N(false);
+    set_H((A & 0xF + *reg & 0xF + get_C()) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)(*reg) + get_C()) > 0xFF);
     A += *reg + get_C();
+    set_Z(A == 0x00);
     cycle_delay(delay);
 }
 
@@ -740,7 +787,11 @@ void gb::OP_SUB_r(uint8_t xxx) {
         delay = 2;
         reg = &memory[HL()];
     }
+    set_N(true);
+    set_H((A & 0xF) < (*reg & 0xF));
+    set_C(A < (*reg));
     A -= *reg;
+    set_Z(A == 0x00);
     cycle_delay(delay);
 }
 
@@ -751,6 +802,11 @@ void gb::OP_SBC_r(uint8_t xxx) {
         delay = 2;
         reg = &memory[HL()];
     }
+    set_N(true);
+    set_H((A & 0xF) < (*reg & 0xF + get_C()));
+    set_C(A < (*reg + get_C()));
+    A -= *reg;
+    set_Z(A == 0x00);
     A -= *reg - get_C();
     cycle_delay(delay);
 }
@@ -763,6 +819,10 @@ void gb::OP_AND_r(uint8_t xxx) {
         reg = &memory[HL()];
     }
     A &= *reg;
+    set_Z(A==0x00);
+    set_N(false);
+    set_H(true);
+    set_C(false);
     cycle_delay(delay);
 }
 
@@ -774,6 +834,10 @@ void gb::OP_OR_r(uint8_t xxx) {
         reg = &memory[HL()];
     }
     A |= *reg;
+    set_Z(A==0x00);
+    set_N(false);
+    set_H(false);
+    set_C(false);
     cycle_delay(delay);
 }
 
@@ -785,6 +849,10 @@ void gb::OP_XOR_r(uint8_t xxx) {
         reg = &memory[HL()];
     }
     A ^= *reg;
+    set_Z(A==0x00);
+    set_N(false);
+    set_H(false);
+    set_C(false);
     cycle_delay(delay);
 }
 
@@ -797,6 +865,10 @@ void gb::OP_CP_r(uint8_t xxx) {
     }
     uint8_t compare_val;
     compare_val = A - *reg;
+    set_Z(compare_val==0x00);
+    set_N(true);
+    set_H((A & 0xF) < (*reg & 0xF));
+    set_C(A < *reg);
     cycle_delay(delay);
 }
 
@@ -834,7 +906,7 @@ void gb::OP_PUSH_r(uint8_t xx) {
             value = HL();
             break;
         case 3:
-            value = SP;
+            value = AF();
             break;
         default:
             break;
@@ -848,8 +920,8 @@ void gb::OP_PUSH_r(uint8_t xx) {
 
 void gb::OP_POP_r(uint8_t xx) {
     uint16_t data;
-    data = memory[SP++];
-    data += (memory[SP++] << 8);
+    data = read_mem(SP++);
+    data += (read_mem(SP++) << 8);
     switch (xx) {
         case 0:
             write_BC(data);
@@ -861,7 +933,7 @@ void gb::OP_POP_r(uint8_t xx) {
             write_HL(data);
             break;
         case 3:
-            SP = data;
+            write_AF(data);
             break;
         default:
             break;
@@ -871,18 +943,26 @@ void gb::OP_POP_r(uint8_t xx) {
 
 void gb::OP_LD_HL_SP_offset() {
     uint16_t offset;
-    offset = memory[PC++];
+    offset = read_mem(PC++);
     if (isbiton(7, offset))
         offset += 0xFF00;
     write_HL(SP + offset);
+    set_Z(false);
+    set_N(false);
+    set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
+    set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
     cycle_delay(3);
 }
 
 void gb::OP_ADD_SP() {
     uint16_t offset;
-    offset = memory[PC++];
+    offset = read_mem(PC++);
     if (isbiton(7, offset))
         offset += 0xFF00;
+    set_Z(false);
+    set_N(false);
+    set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
+    set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
     SP += offset;
     cycle_delay(4);
 }
@@ -896,43 +976,78 @@ void gb::OP_EI() {
 }
 
 void gb::OP_ADD_A_imm() {
-    A += read_mem(PC++);
+    uint8_t temp = read_mem(PC++);
+    set_N(false);
+    set_H((A & 0xF + temp & 0xF) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)(temp)) > 0xFF);
+    A += temp;
+    set_Z(A == 0x00);
     cycle_delay(2);
 }
 
 void gb::OP_ADC_A_imm() {
-    A += read_mem(PC++) + get_C();
+    uint8_t temp = read_mem(PC++);
+    set_N(false);
+    set_H((A & 0xF + temp & 0xF + get_C()) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)(temp) + get_C()) > 0xFF);
+    A += temp + get_C();
+    set_Z(A == 0x00);
     cycle_delay(2);
 }
 
 void gb::OP_SUB_A_imm() {
-    A -= read_mem(PC++);
+    uint8_t temp = read_mem(PC++);
+    set_N(true);
+    set_H((A & 0xF) < (temp & 0xF));
+    set_C((A < temp));
+    A -= temp;
+    set_Z(A == 0x00);
     cycle_delay(2);
 }
 
 void gb::OP_SBC_A_imm() {
-    A -= read_mem(PC++) - get_C();
+    uint8_t temp = read_mem(PC++);
+    set_N(true);
+    set_H((A & 0xF) < (temp & 0xF + get_C()));
+    set_C((A < (temp + get_C())));
+    A -= (temp + get_C());
+    set_Z(A == 0x00);
     cycle_delay(2);
 }
 
 void gb::OP_AND_A_imm() {
     A &= read_mem(PC++);
+    set_Z(A == 0x00);
+    set_N(false);
+    set_H(true);
+    set_C(false);
     cycle_delay(2);
 }
 
 void gb::OP_OR_A_imm() {
     A |= read_mem(PC++);
+    set_Z(A == 0x00);
+    set_N(false);
+    set_H(false);
+    set_C(false);
     cycle_delay(2);
 }
 
 void gb::OP_XOR_A_imm() {
     A ^= read_mem(PC++);
+    set_Z(A == 0x00);
+    set_N(false);
+    set_H(false);
+    set_C(false);
     cycle_delay(2);
 }
 
 void gb::OP_CP_A_imm() {
-    uint8_t compare_val = A;
-    compare_val -= read_mem(PC++);
+    uint8_t temp = read_mem(PC++);
+    set_N(true);
+    set_H((A & 0xF) < (temp & 0xF));
+    set_C((A < temp));
+    set_Z(A == temp);
     cycle_delay(2);
 }
 
@@ -954,7 +1069,9 @@ void gb::OP_JP_test(uint8_t xx) {
     uint16_t address;
     address = read_mem(PC++);
     address += (read_mem(PC++) << 8);
+    printf("JR cc %X\n", address);
     if(test_condition(xx)){
+        printf("Jumping now...\n");
         PC = address;
         delay++;
     }
@@ -972,7 +1089,9 @@ void gb::OP_JR_test(uint8_t cc) {
     uint8_t delay = 2;
     uint16_t offset = read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
+    printf("JR (jump relative) cc %X\n", offset);
     if(test_condition(cc)){
+        printf("Jumping now...\n");
         PC = PC + offset;
         delay++;
     }
@@ -983,6 +1102,7 @@ void gb::OP_CALL() {
     uint16_t address;
     address = read_mem(PC++);
     address += (read_mem(PC++) << 8);
+    printf("CALL %X, pushing %X onto stack\n", address, PC);
     SP--;
     write_mem(SP--, (PC >> 8));
     write_mem(SP, (PC & 0xFF));
@@ -1008,6 +1128,7 @@ void gb::OP_CALL_test(uint8_t xx) {
 void gb::OP_RET() {
     uint16_t newPC = read_mem(SP++);
     newPC += (read_mem(SP++) << 8);
+    printf("RET %X\n", newPC);
     PC = newPC;
     cycle_delay(4);
 }
@@ -1316,12 +1437,15 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
 }
 
 void gb::write_mem(uint16_t address, uint8_t value) {
-    //todo: go back and actually use these
+    //todo: implement banking, any other indirection, etc.
+    //todo: go back and replace all the memory[] writes
     memory[address] = value;
 }
 
 uint8_t gb::read_mem(uint16_t address) {
     //todo: go back and actually use these
+
+    //todo: go back and replace all the '&memory[HL()]' and similar calls
     if (address == 0xFF00){
         //joypad register
         if(!isbiton(5, memory[0xFF00]))
@@ -1335,7 +1459,11 @@ uint8_t gb::read_mem(uint16_t address) {
             return ((memory[0xFF00] & 0xF0) | (directions & 0x0F));
         }
     }
-    else
+    else if (address < 0x100 && memory[0xFF50] == 0x00)
+    {
+        return bootrom[address];
+    }
+    else //todo: more banking shiz
         return memory[address];
 }
 
@@ -1441,6 +1569,15 @@ bool gb::test_condition(uint8_t cc) const {
             break;
     }
     return test;
+}
+
+uint16_t gb::AF() const {
+    return (A << 8) + F;
+}
+
+void gb::write_AF(uint16_t value) {
+    A = value >> 8;
+    F = value & 0xFF;
 }
 
 

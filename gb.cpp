@@ -13,13 +13,82 @@ gb::gb()
     enable_interrupts = false;
     disable_interrupts = false;
     opcode = 0;
+    cycles_since_last_screen = 0;
 
-    //todo: initialize all register values that have a fixed value
-    write_mem(0xFF00, 0xFF); //P1 register - controller
-    write_mem(0xFF0F, 0xE0); //IF register - interrupts
-    write_mem(0xFFFF, 0x00); //IE register - interrupts
-    write_mem(0xFF50, 0x00); // if nonzero, bootrom is disabled
+    //pandocs says these are the MGB initial values for the cpu regs
+    A = 0xFF;
+    B = 0x00;
+    C = 0x13;
+    D = 0x00;
+    E = 0xD8;
+    F = 0x00;
+    set_Z(true);
+    //set_N(false); //unneeded
+    //set_H(false); //H and C are affected by cartridge checksum. init to 0?
+    //set_C(false);
+    H = 0x01;
+    L = 0x4D;
     SP = 0xFFFE;
+    //PC = 0x0100; //according to pandocs? I think they skip the bios though
+    write_mem(0xFF00, 0xFF); //P1 register - controller
+    write_mem(0xFF01, 0x00);
+    write_mem(0xFF02, 0x7E);
+    write_mem(0xFF04, 0xAB);
+    write_mem(0xFF05, 0x00);
+    write_mem(0xFF06, 0x00);
+    write_mem(0xFF07, 0xF8);
+    write_mem(0xFF0F, 0xE1); //IF register - interrupts
+    write_mem(0xFF10, 0x80);
+    write_mem(0xFF11, 0xBF);
+    write_mem(0xFF12, 0xF3);
+    write_mem(0xFF13, 0xFF);
+    write_mem(0xFF14, 0xBF);
+    write_mem(0xFF16, 0x3F);
+    write_mem(0xFF17, 0x00);
+    write_mem(0xFF18, 0xFF);
+    write_mem(0xFF19, 0xBF);
+    write_mem(0xFF1A, 0x7F);
+    write_mem(0xFF1B, 0xFF);
+    write_mem(0xFF1C, 0x9F);
+    write_mem(0xFF1D, 0xFF);
+    write_mem(0xFF1E, 0xBF);
+    write_mem(0xFF20, 0xFF);
+    write_mem(0xFF21, 0x00);
+    write_mem(0xFF22, 0x00);
+    write_mem(0xFF23, 0xBF);
+    write_mem(0xFF24, 0x77);
+    write_mem(0xFF25, 0xF3);
+    write_mem(0xFF26, 0xF1);
+    write_mem(0xFF40, 0x91);
+    write_mem(0xFF41, 0x85);
+    write_mem(0xFF42, 0x00);
+    write_mem(0xFF43, 0x00);
+    write_mem(0xFF44, 0x00);
+    write_mem(0xFF45, 0x00);
+    write_mem(0xFF46, 0xFF);
+    write_mem(0xFF47, 0xFC);
+    write_mem(0xFF48, 0x00); //may also be FF
+    write_mem(0xFF49, 0x00); //may also be FF
+    write_mem(0xFF4A, 0x00);
+    write_mem(0xFF4B, 0x00);
+    write_mem(0xFF4D, 0xFF);
+    write_mem(0xFF4F, 0xFF);
+    write_mem(0xFF50, 0xFF); // if nonzero, bootrom is disabled
+    write_mem(0xFF51, 0xFF);
+    write_mem(0xFF52, 0xFF);
+    write_mem(0xFF53, 0xFF);
+    write_mem(0xFF54, 0xFF);
+    write_mem(0xFF55, 0xFF);
+    write_mem(0xFF56, 0xFF);
+    write_mem(0xFF68, 0xFF);
+    write_mem(0xFF69, 0xFF);
+    write_mem(0xFF6A, 0xFF);
+    write_mem(0xFF6B, 0xFF);
+    write_mem(0xFF70, 0xFF);
+    write_mem(0xFFFF, 0x00); //IE register - interrupts
+
+    timer_counter = 1024;
+    divider_counter = 0;
 
     //load boot rom
     //open file as binary stream and move file pointer to end
@@ -48,7 +117,6 @@ gb::gb()
 
 void gb::LoadROM(const char *filename)
 {
-    //todo: add banking capability
     //open file as binary stream and move file pointer to end
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
 
@@ -107,10 +175,11 @@ bool gb::any_interrupts() {
 }
 
 void gb::request_interrupt(uint8_t irq_num) {
+    //I'm fine with this directly writing to memory
     memory[0xFF0F] |= (0x01 << irq_num);
 }
 
-void gb::Cycle() {
+void gb::CPU_execute_op() {
 
     //TODO: ensure interrupt handler works
     if(!any_interrupts()) {
@@ -123,6 +192,8 @@ void gb::Cycle() {
         PC++;
 
         if (CB_instruction) {
+            cycles_since_last_screen += 1;
+            cycle_delay(1);
             switch ((opcode & 0xF0u) >> 6) {
                 case 0: //00
                     switch (get_bits_3_5(opcode)) {
@@ -348,14 +419,14 @@ void gb::Cycle() {
     }
 }
 
-void gb::Joypad() {
+void gb::update_joypad_reg() {
     if(!(read_mem(0xFF00) & 0b00100000)) //if bit 5 is set 0
     {
-        memory[0xFF00] = (read_mem(0xFF00) & 0xF0) + (directions & 0x0F);
+        write_mem(0xFF00, ((read_mem(0xFF00) & 0xF0) + (directions & 0x0F)));
     }
     else if(!(read_mem(0xFF00) & 0b00010000)) //if bit 4 is set 0
     {
-        memory[0xFF00] = (read_mem(0xFF00) & 0xF0) + (buttons & 0x0F);
+        write_mem(0xFF00, ((read_mem(0xFF00) & 0xF0) + (buttons & 0x0F)));
     }
 }
 
@@ -429,6 +500,7 @@ void gb::OP_RST(uint8_t xxx) {
             break;
     }
     PC = reset;
+    cycles_since_last_screen += 8;
     cycle_delay(8);
 }
 
@@ -448,6 +520,7 @@ void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
         delay = 2;
     }
     *destination = *source;
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -462,6 +535,7 @@ void gb::OP_LD_imm(uint8_t xxx) {
     }
     uint8_t imm = read_mem(PC++);
     *destination = imm;
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -518,6 +592,7 @@ void gb::OP_LD_mem(uint8_t xxx) {
     *destination = *source;
     if (increment) inc_HL();
     if (decrement) dec_HL();
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -539,8 +614,9 @@ void gb::OP_LDH(uint8_t yyy) {
     else
     {
         //destination is mem
-        memory[address] = A;
+        write_mem(address, A);
     }
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -565,14 +641,16 @@ void gb::OP_LD_imm16(uint8_t xx) {
         default:
             break;
     }
+    cycles_since_last_screen += 3;
     cycle_delay(3);
 }
 
 void gb::OP_STORE_SP() {
     uint16_t address = read_mem(PC++);
     address += (read_mem(PC++) << 8);
-    memory[address] = (SP & 0xFF);
-    memory[address+1] = (SP >> 8);
+    write_mem(address, (SP & 0xFF));
+    write_mem(address+1, (SP >> 8));
+    cycles_since_last_screen += 5;
     cycle_delay(5);
 }
 
@@ -589,6 +667,7 @@ void gb::OP_INC_r(uint8_t xxx) {
     set_Z(*reg == 0);
     set_N(false);
     set_H(((temp & 0xF) + 1) > 0xF);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -604,6 +683,7 @@ void gb::OP_DEC_r(uint8_t xxx) {
     set_Z(*reg == 0);
     set_N(true);
     set_H(((temp & 0xF)) == 0x00);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -634,6 +714,7 @@ void gb::OP_ADD16(uint8_t xx) {
         default:
             break;
     }
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -655,6 +736,7 @@ void gb::OP_INC16(uint8_t xx) {
         default:
             break;
     }
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -676,6 +758,7 @@ void gb::OP_DEC16(uint8_t xx) {
         default:
             break;
     }
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -688,12 +771,14 @@ void gb::OP_DAA() {
     set_Z(A == 0);
     set_H(false);
     set_C(tens > 9);
+    cycles_since_last_screen += 1;
     cycle_delay(1);
 }
 
 void gb::OP_CPL() {
     A = ~A;
     cycle_delay(1);
+    cycles_since_last_screen += 1;
     set_N(true);
     set_H(true);
 }
@@ -706,6 +791,7 @@ void gb::OP_CCF() {
         set_C(true);
     set_H(false);
     set_N(false);
+    cycles_since_last_screen += 1;
     cycle_delay(1);
 }
 
@@ -714,6 +800,7 @@ void gb::OP_SCF() {
     set_C(true);
     set_H(false);
     set_N(false);
+    cycles_since_last_screen += 1;
     cycle_delay(1);
 }
 
@@ -747,6 +834,7 @@ void gb::OP_rot_shift_A(uint8_t xxx) {
             break;
     }
     A = newA;
+    cycles_since_last_screen += 1;
     cycle_delay(1);
 }
 
@@ -762,6 +850,7 @@ void gb::OP_ADD_r(uint8_t xxx) {
     set_C(((uint16_t)A + (uint16_t)(*reg)) > 0xFF);
     A += *reg;
     set_Z(A == 0x00);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -777,6 +866,7 @@ void gb::OP_ADC_r(uint8_t xxx) {
     set_C(((uint16_t)A + (uint16_t)(*reg) + get_C()) > 0xFF);
     A += *reg + get_C();
     set_Z(A == 0x00);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -792,6 +882,7 @@ void gb::OP_SUB_r(uint8_t xxx) {
     set_C(A < (*reg));
     A -= *reg;
     set_Z(A == 0x00);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -808,6 +899,7 @@ void gb::OP_SBC_r(uint8_t xxx) {
     A -= *reg;
     set_Z(A == 0x00);
     A -= *reg - get_C();
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -823,6 +915,7 @@ void gb::OP_AND_r(uint8_t xxx) {
     set_N(false);
     set_H(true);
     set_C(false);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -838,6 +931,7 @@ void gb::OP_OR_r(uint8_t xxx) {
     set_N(false);
     set_H(false);
     set_C(false);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -853,6 +947,7 @@ void gb::OP_XOR_r(uint8_t xxx) {
     set_N(false);
     set_H(false);
     set_C(false);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -869,6 +964,7 @@ void gb::OP_CP_r(uint8_t xxx) {
     set_N(true);
     set_H((A & 0xF) < (*reg & 0xF));
     set_C(A < *reg);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -885,11 +981,13 @@ void gb::OP_LD_mem16() {
         //destination is mem
         write_mem(address, A);
     }
+    cycles_since_last_screen += 4;
     cycle_delay(4);
 }
 
 void gb::OP_LD_SP_HL() {
     SP = HL();
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -915,6 +1013,7 @@ void gb::OP_PUSH_r(uint8_t xx) {
     write_mem(SP, (value >> 8));
     SP--;
     write_mem(SP, (value & 0xFF));
+    cycles_since_last_screen += 4;
     cycle_delay(4);
 }
 
@@ -938,6 +1037,7 @@ void gb::OP_POP_r(uint8_t xx) {
         default:
             break;
     }
+    cycles_since_last_screen += 3;
     cycle_delay(3);
 }
 
@@ -951,6 +1051,7 @@ void gb::OP_LD_HL_SP_offset() {
     set_N(false);
     set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
     set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
+    cycles_since_last_screen += 3;
     cycle_delay(3);
 }
 
@@ -964,15 +1065,20 @@ void gb::OP_ADD_SP() {
     set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
     set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
     SP += offset;
+    cycles_since_last_screen += 4;
     cycle_delay(4);
 }
 
 void gb::OP_DI() {
     disable_interrupts = true;
+    cycles_since_last_screen += 1;
+    cycle_delay(1);
 }
 
 void gb::OP_EI() {
     enable_interrupts = true;
+    cycles_since_last_screen += 1;
+    cycle_delay(1);
 }
 
 void gb::OP_ADD_A_imm() {
@@ -982,6 +1088,7 @@ void gb::OP_ADD_A_imm() {
     set_C(((uint16_t)A + (uint16_t)(temp)) > 0xFF);
     A += temp;
     set_Z(A == 0x00);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -992,6 +1099,7 @@ void gb::OP_ADC_A_imm() {
     set_C(((uint16_t)A + (uint16_t)(temp) + get_C()) > 0xFF);
     A += temp + get_C();
     set_Z(A == 0x00);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -1002,6 +1110,7 @@ void gb::OP_SUB_A_imm() {
     set_C((A < temp));
     A -= temp;
     set_Z(A == 0x00);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -1012,6 +1121,7 @@ void gb::OP_SBC_A_imm() {
     set_C((A < (temp + get_C())));
     A -= (temp + get_C());
     set_Z(A == 0x00);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -1021,6 +1131,7 @@ void gb::OP_AND_A_imm() {
     set_N(false);
     set_H(true);
     set_C(false);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -1030,6 +1141,7 @@ void gb::OP_OR_A_imm() {
     set_N(false);
     set_H(false);
     set_C(false);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -1039,6 +1151,7 @@ void gb::OP_XOR_A_imm() {
     set_N(false);
     set_H(false);
     set_C(false);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -1048,6 +1161,7 @@ void gb::OP_CP_A_imm() {
     set_H((A & 0xF) < (temp & 0xF));
     set_C((A < temp));
     set_Z(A == temp);
+    cycles_since_last_screen += 2;
     cycle_delay(2);
 }
 
@@ -1056,11 +1170,13 @@ void gb::OP_JP() {
     address = read_mem(PC++);
     address += (read_mem(PC++) << 8);
     PC = address;
+    cycles_since_last_screen += 4;
     cycle_delay(4);
 }
 
 void gb::OP_JP_HL() {
     PC = HL();
+    cycles_since_last_screen += 1;
     cycle_delay(1);
 }
 
@@ -1075,6 +1191,7 @@ void gb::OP_JP_test(uint8_t xx) {
         PC = address;
         delay++;
     }
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1082,6 +1199,7 @@ void gb::OP_JR() {
     uint16_t offset = read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
     PC = PC + offset;
+    cycles_since_last_screen += 3;
     cycle_delay(3);
 }
 
@@ -1095,6 +1213,7 @@ void gb::OP_JR_test(uint8_t cc) {
         PC = PC + offset;
         delay++;
     }
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1107,6 +1226,7 @@ void gb::OP_CALL() {
     write_mem(SP--, (PC >> 8));
     write_mem(SP, (PC & 0xFF));
     PC = address;
+    cycles_since_last_screen += 6;
     cycle_delay(6);
 }
 
@@ -1122,6 +1242,7 @@ void gb::OP_CALL_test(uint8_t xx) {
         PC = address;
         delay += 3;
     }
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1130,6 +1251,7 @@ void gb::OP_RET() {
     newPC += (read_mem(SP++) << 8);
     printf("RET %X\n", newPC);
     PC = newPC;
+    cycles_since_last_screen += 4;
     cycle_delay(4);
 }
 
@@ -1142,6 +1264,7 @@ void gb::OP_RET_test(uint8_t xx) {
         newPC += (read_mem(SP++) << 8);
         PC = newPC;
     }
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1150,6 +1273,7 @@ void gb::OP_RETI() {
     newPC += (read_mem(SP++) << 8);
     PC = newPC;
     IME = true;
+    cycles_since_last_screen += 4;
     cycle_delay(4);
 }
 
@@ -1180,6 +1304,7 @@ void gb::CB_RLC(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1210,6 +1335,7 @@ void gb::CB_RL(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1240,6 +1366,7 @@ void gb::CB_RRC(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1270,6 +1397,7 @@ void gb::CB_RR(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1296,6 +1424,7 @@ void gb::CB_SLA(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1326,6 +1455,7 @@ void gb::CB_SRA(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1352,6 +1482,7 @@ void gb::CB_SWAP(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1378,6 +1509,7 @@ void gb::CB_SRL(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1395,6 +1527,7 @@ void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
     set_H(true);
     set_N(false);
     set_Z(isbiton(bbb, temp));
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1414,6 +1547,7 @@ void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
         *reg = temp;
     }
     //flags are not affected here
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
@@ -1433,19 +1567,45 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
         *reg = temp;
     }
     //flags are not affected here
+    cycles_since_last_screen += delay;
     cycle_delay(delay);
 }
 
 void gb::write_mem(uint16_t address, uint8_t value) {
-    //todo: implement banking, any other indirection, etc.
+    //todo: implement rom banking, any other indirection, etc.
     //todo: go back and replace all the memory[] writes
-    memory[address] = value;
+    //don't allow writes to read-only memory
+    if (address < 0x8000)
+    {
+        printf("Attempted write to ROM, address %x\n", address);
+    }
+    // writes to ECHO RAM writes to RAM as well
+    else if ((address >= 0xE000) && (address < 0xFE00))
+    {
+        memory[address] = value;
+        write_mem(address-0x2000, value);
+    }
+    //this area is restricted
+    else if (( address >= 0xFEA0 ) && (address < 0xFEFF))
+    {
+        printf("Attempted write to restricted memory, address %x\n", address);
+    }
+    else if (address == 0xFF07)
+    {
+        //update timer controller!
+        memory[0xFF07] = value;
+        set_clock_freq();
+    }
+    else if (address == 0xFF04){
+        //attempted write to timer div register, resets it
+        memory[0xFF04] = 0;
+    }
+    else
+        memory[address] = value;
 }
 
 uint8_t gb::read_mem(uint16_t address) {
-    //todo: go back and actually use these
-
-    //todo: go back and replace all the '&memory[HL()]' and similar calls
+    //todo: go back and replace all the '&memory[HL()]' calls
     if (address == 0xFF00){
         //joypad register
         if(!isbiton(5, memory[0xFF00]))
@@ -1453,7 +1613,7 @@ uint8_t gb::read_mem(uint16_t address) {
             //action buttons selected
             return ((memory[0xFF00] & 0xF0) | (buttons & 0x0F));
         }
-        if(!isbiton(4, memory[0xFF00]))
+        else if(!isbiton(4, memory[0xFF00]))
         {
             //direction buttons selected
             return ((memory[0xFF00] & 0xF0) | (directions & 0x0F));
@@ -1578,6 +1738,56 @@ uint16_t gb::AF() const {
 void gb::write_AF(uint16_t value) {
     A = value >> 8;
     F = value & 0xFF;
+}
+
+void gb::update_timers(uint32_t cycles) {
+    //handle_div_reg(uint32_t cycles);
+    if(isclockenabled()){
+        timer_counter -= cycles;
+
+        // have enough cpu cycles happened to update timer?
+        if (timer_counter <= 0)
+        {
+            //reset timer_counter to correct value
+            set_clock_freq();
+
+            //is timer about to overflow?
+            if(read_mem(0xFF05) == 255)
+            {
+                write_mem(0xFF05, read_mem(0xFF06));
+                request_interrupt(2);
+            }
+            else
+            {
+                write_mem(0xFF05, (read_mem(0xFF05)+1));
+            }
+        }
+    }
+
+}
+
+bool gb::isclockenabled() {
+    return isbiton(2, read_mem(0xFF07));
+}
+
+void gb::handle_div_reg(uint32_t cycles) {
+    divider_counter += cycles;
+    if(divider_counter >= 255)
+    {
+        divider_counter = 0;
+        memory[0xFF04]++;
+    }
+}
+
+void gb::set_clock_freq() {
+    uint8_t freq = read_mem(0xFF07) & 0x03;
+    switch (freq)
+    {
+        case 0: timer_counter = 1024;
+        case 1: timer_counter = 16;
+        case 2: timer_counter = 64;
+        case 3: timer_counter = 256;
+    }
 }
 
 

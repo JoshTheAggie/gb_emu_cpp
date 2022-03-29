@@ -7,7 +7,7 @@
 int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM name
     if(argc != 4)
     {
-        std::cerr << "Usage: " << argv[0] << " <Scale> <Cycle period (ms)> <ROM>\n";
+        std::cerr << "Usage: " << argv[0] << " <Scale> <CPU_execute_op period (ms)> <ROM>\n";
         std::exit(EXIT_FAILURE);
     }
 
@@ -20,25 +20,32 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
     gb cpu{};
     cpu.LoadROM(romFileName);
 
-    int videoPitch = sizeof(cpu.video[0]) * VIDEO_WIDTH;
-
     auto lastCycleTime = std::chrono::high_resolution_clock::now();
     bool quit = false;
 
+    const int MAXCYCLES = 69905;
+    uint32_t oldCycles = 0, deltaCycles = 0;
+
     while(!quit)
     {
-        quit = platform.ProcessInput(cpu.directions, cpu.buttons);
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float dt = std::chrono::duration<float, std::chrono::nanoseconds::period>(currentTime-lastCycleTime).count();
-
-        if (dt > cycleDelay)
-        {
-            lastCycleTime = currentTime;
-            cpu.Joypad();
-            cpu.Cycle();
-            platform.Update(cpu.video, videoPitch);
+        //quit = platform.ProcessInput(cpu.directions, cpu.buttons);
+        //auto currentTime = std::chrono::high_resolution_clock::now();
+        //float dt = std::chrono::duration<float, std::chrono::nanoseconds::period>(currentTime-lastCycleTime).count();
+        //if (dt > cycleDelay){
+            //lastCycleTime = currentTime;
+        while ((cpu.cycles_since_last_screen < MAXCYCLES) && !quit) {
+            quit = platform.ProcessInput(cpu.directions, cpu.buttons);
+            cpu.update_joypad_reg();
+            cpu.CPU_execute_op();
+            deltaCycles = cpu.cycles_since_last_screen - oldCycles;
+            cpu.update_timers(deltaCycles);
+            //todo: cpu.ppu.update_graphics(deltaCycles)
+            oldCycles = cpu.cycles_since_last_screen;
         }
+        cpu.cycles_since_last_screen = 0;
+        //todo: render_screen()
+        platform.Update(cpu.video);
+
     }
     return 0;
 }

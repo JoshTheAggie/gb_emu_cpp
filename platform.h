@@ -34,7 +34,7 @@ public:
         delete texture;
     }
 
-    void Update(void const* buffer, int pitch)
+    void Update(void const* buffer)
     {
         texture->update((sf::Uint8*)buffer);
         window->clear();

@@ -10,7 +10,6 @@
 #ifndef GBEMUJM_GB_H
 #define GBEMUJM_GB_H
 
-const unsigned int START_ADDRESS = 0x100;
 const unsigned int VIDEO_WIDTH = 160;
 const unsigned int VIDEO_HEIGHT = 144;
 
@@ -163,7 +162,9 @@ class gb {
     //helper function for conditional testing
     bool test_condition(uint8_t cc) const;
 
-
+    //timer counter
+    int32_t timer_counter;
+    int32_t divider_counter;
 public:
     //graphics
     uint32_t video [VIDEO_WIDTH * VIDEO_HEIGHT]{};
@@ -172,8 +173,16 @@ public:
 
     gb();
     void LoadROM(char const *filename);
-    void Cycle();
-    void Joypad();
+    void CPU_execute_op();
+    void update_joypad_reg();
+    uint32_t cycles_since_last_screen;
+
+    //hardware timers
+    void update_timers(uint32_t cycles);
+    bool isclockenabled();
+    void handle_div_reg(uint32_t cycles);
+    void set_clock_freq();
+    const uint32_t CLOCKSPEED = 4194304;
 };
 
 #endif //GBEMUJM_GB_H

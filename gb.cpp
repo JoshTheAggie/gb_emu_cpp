@@ -1608,6 +1608,11 @@ void gb::write_mem(uint16_t address, uint8_t value) {
         //attempted write to scanline counter, resets it
         memory[address] = 0;
     }
+    else if (address == 0xFF46)
+    {
+        //DMA time
+        performDMAtransfer(value);
+    }
     else
         memory[address] = value;
 }
@@ -1795,6 +1800,16 @@ void gb::set_clock_freq() {
         case 1: timer_counter = 16;
         case 2: timer_counter = 64;
         case 3: timer_counter = 256;
+    }
+}
+
+void gb::performDMAtransfer(uint8_t data) {
+    //copies 0xA0 bytes into sprite RAM.
+    //source address is the data originally attempted to write to 0xFF46 * 0x100
+    uint16_t address = data << 8;
+    for (int i = 0; i < 0xA0; i++)
+    {
+        write_mem(0xFE00+i, read_mem(address+i));
     }
 }
 

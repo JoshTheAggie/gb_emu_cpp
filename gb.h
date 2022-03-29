@@ -168,6 +168,9 @@ class gb {
     //timer counter
     int32_t timer_counter;
     int32_t divider_counter;
+
+    //DMA transfer
+    void performDMAtransfer(uint8_t data);
 public:
     //graphics
     uint32_t video [VIDEO_WIDTH * VIDEO_HEIGHT]{};

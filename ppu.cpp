@@ -48,7 +48,7 @@ void ppu::update_graphics(uint32_t cycles) {
 }
 
 void ppu::draw_scanline() {
-
+    //does nothing yet
 }
 
 void ppu::setLCDstatus() {

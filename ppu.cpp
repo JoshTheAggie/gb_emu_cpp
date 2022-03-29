@@ -266,7 +266,13 @@ void ppu::render_tiles() {
 }
 
 void ppu::render_sprites() {
+    bool use8x16 = obj_size();
 
+    //loop through all 40 sprites
+    for (int sprite = 0; sprite < 40; sprite++)
+    {
+        //todo: do shit here
+    }
 }
 
 uint8_t ppu::getbitvalue(uint8_t num, uint8_t data) {

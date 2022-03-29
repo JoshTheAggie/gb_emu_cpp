@@ -15,6 +15,9 @@ gb::gb()
     opcode = 0;
     cycles_since_last_screen = 0;
 
+    //instantiate PPU
+    gpu = new ppu(reinterpret_cast<uint8_t *>(&memory), reinterpret_cast<uint32_t *>(&video));
+
     //pandocs says these are the MGB initial values for the cpu regs
     A = 0xFF;
     B = 0x00;
@@ -1599,6 +1602,11 @@ void gb::write_mem(uint16_t address, uint8_t value) {
     else if (address == 0xFF04){
         //attempted write to timer div register, resets it
         memory[0xFF04] = 0;
+    }
+    else if (address == 0xFF44)
+    {
+        //attempted write to scanline counter, resets it
+        memory[address] = 0;
     }
     else
         memory[address] = value;

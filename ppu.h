@@ -6,21 +6,18 @@
 #ifndef GBEMUJM_PPU_H
 #define GBEMUJM_PPU_H
 
-#define SCY (memory[0xFF42])
-#define SCX (memory[0xFF43])
-#define LY (memory[0xFF44])
-#define LYC (memory[0xFF45]) //register of Y coordinate to generate interrupt (FF41)
-#define DMA (memory[0xFF46])
-#define BGP (memory[0xFF47])
-#define OBP0 (memory[0xFF48])
-#define OBP1 (memory[0xFF49])
-#define WY (memory[0xFF4A])
-#define WX (memory[0xFF4B])
+#define SCY memory[0xFF42]
+#define SCX memory[0xFF43]
+#define LY memory[0xFF44]
+#define LYC memory[0xFF45] //register of Y coordinate to generate interrupt (FF41)
+#define DMA memory[0xFF46]
+#define BGP memory[0xFF47]
+#define OBP0 memory[0xFF48]
+#define OBP1 memory[0xFF49]
+#define WY memory[0xFF4A]
+#define WX memory[0xFF4B]
 
 class ppu {
-    //is oam memory locked??
-    bool VRAM_OAM_lock; //todo: implement this later
-
     //need a pointer to the memory of the SOC
     uint8_t *memory;
     //need a pointer to the display buffer
@@ -37,19 +34,23 @@ class ppu {
     // 10 lines of V-blank
 
     // 114x154 = 17556 clocks per screen. At 1MHz, that's 59.7 Hz refresh
-
+public:
     ppu(uint8_t* mem, uint32_t* video);
 
     void oam_search();
-    void draw_line();
+    void draw_scanline();
     void h_blank();
     void check_lyc();
+    void setLCDstatus();
 
     void write_from_CPU(uint16_t address, uint8_t data); //if locked, silently fail
     uint8_t read_to_CPU(uint16_t address); //if locked, return FF
 
+    void update_graphics(uint32_t cycles);
+
 private:
     int line_count = 0;
+    int scanline_counter = 0;
 
     //LCD Control register
     bool display_enabled(){return (memory[0xFF40] & 0x80) != 0;}; //lighter than white

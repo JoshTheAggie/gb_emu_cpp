@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
+#include "ppu.h"
 #include <SFML/System/Clock.hpp>
 
 #ifndef GBEMUJM_GB_H
@@ -21,6 +22,8 @@ class gb {
     uint8_t memory [0x10000]{};    //64KiB of memory
     uint8_t bootrom [256]{}; //256 byte bootstrap
     uint8_t cartridge_rom [0x200000]{}; //cartridge rom
+
+    ppu * gpu;
     /*
   0000-3FFF   16KB ROM Bank 00     (in cartridge, fixed at bank 00)
   4000-7FFF   16KB ROM Bank 01..NN (in cartridge, switchable bank number)

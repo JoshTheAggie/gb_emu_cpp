@@ -33,123 +33,67 @@ gb::gb()
     L = 0x4D;
     SP = 0xFFFE;
     //PC = 0x0100; //according to pandocs? I think they skip the bios though
-    write_mem(0xFF00, 0xFF); //P1 register - controller
-    write_mem(0xFF01, 0x00);
-    write_mem(0xFF02, 0x7E);
-    write_mem(0xFF04, 0xAB);
-    write_mem(0xFF05, 0x00);
-    write_mem(0xFF06, 0x00);
-    write_mem(0xFF07, 0xF8);
-    write_mem(0xFF0F, 0xE1); //IF register - interrupts
-    write_mem(0xFF10, 0x80);
-    write_mem(0xFF11, 0xBF);
-    write_mem(0xFF12, 0xF3);
-    write_mem(0xFF13, 0xFF);
-    write_mem(0xFF14, 0xBF);
-    write_mem(0xFF16, 0x3F);
-    write_mem(0xFF17, 0x00);
-    write_mem(0xFF18, 0xFF);
-    write_mem(0xFF19, 0xBF);
-    write_mem(0xFF1A, 0x7F);
-    write_mem(0xFF1B, 0xFF);
-    write_mem(0xFF1C, 0x9F);
-    write_mem(0xFF1D, 0xFF);
-    write_mem(0xFF1E, 0xBF);
-    write_mem(0xFF20, 0xFF);
-    write_mem(0xFF21, 0x00);
-    write_mem(0xFF22, 0x00);
-    write_mem(0xFF23, 0xBF);
-    write_mem(0xFF24, 0x77);
-    write_mem(0xFF25, 0xF3);
-    write_mem(0xFF26, 0xF1);
-    write_mem(0xFF40, 0x91);
-    write_mem(0xFF41, 0x85);
-    write_mem(0xFF42, 0x00);
-    write_mem(0xFF43, 0x00);
-    write_mem(0xFF44, 0x00);
-    write_mem(0xFF45, 0x00);
-    write_mem(0xFF46, 0xFF);
-    write_mem(0xFF47, 0xFC);
-    write_mem(0xFF48, 0x00); //may also be FF
-    write_mem(0xFF49, 0x00); //may also be FF
-    write_mem(0xFF4A, 0x00);
-    write_mem(0xFF4B, 0x00);
-    write_mem(0xFF4D, 0xFF);
-    write_mem(0xFF4F, 0xFF);
-    write_mem(0xFF50, 0xFF); // if nonzero, bootrom is disabled
-    write_mem(0xFF51, 0xFF);
-    write_mem(0xFF52, 0xFF);
-    write_mem(0xFF53, 0xFF);
-    write_mem(0xFF54, 0xFF);
-    write_mem(0xFF55, 0xFF);
-    write_mem(0xFF56, 0xFF);
-    write_mem(0xFF68, 0xFF);
-    write_mem(0xFF69, 0xFF);
-    write_mem(0xFF6A, 0xFF);
-    write_mem(0xFF6B, 0xFF);
-    write_mem(0xFF70, 0xFF);
-    write_mem(0xFFFF, 0x00); //IE register - interrupts
+    sharedMemory.write_mem(0xFF00, 0xFF); //P1 register - controller
+    sharedMemory.write_mem(0xFF01, 0x00);
+    sharedMemory.write_mem(0xFF02, 0x7E);
+    sharedMemory.write_mem(0xFF04, 0xAB);
+    sharedMemory.write_mem(0xFF05, 0x00);
+    sharedMemory.write_mem(0xFF06, 0x00);
+    sharedMemory.write_mem(0xFF07, 0xF8);
+    sharedMemory.write_mem(0xFF0F, 0xE1); //IF register - interrupts
+    sharedMemory.write_mem(0xFF10, 0x80);
+    sharedMemory.write_mem(0xFF11, 0xBF);
+    sharedMemory.write_mem(0xFF12, 0xF3);
+    sharedMemory.write_mem(0xFF13, 0xFF);
+    sharedMemory.write_mem(0xFF14, 0xBF);
+    sharedMemory.write_mem(0xFF16, 0x3F);
+    sharedMemory.write_mem(0xFF17, 0x00);
+    sharedMemory.write_mem(0xFF18, 0xFF);
+    sharedMemory.write_mem(0xFF19, 0xBF);
+    sharedMemory.write_mem(0xFF1A, 0x7F);
+    sharedMemory.write_mem(0xFF1B, 0xFF);
+    sharedMemory.write_mem(0xFF1C, 0x9F);
+    sharedMemory.write_mem(0xFF1D, 0xFF);
+    sharedMemory.write_mem(0xFF1E, 0xBF);
+    sharedMemory.write_mem(0xFF20, 0xFF);
+    sharedMemory.write_mem(0xFF21, 0x00);
+    sharedMemory.write_mem(0xFF22, 0x00);
+    sharedMemory.write_mem(0xFF23, 0xBF);
+    sharedMemory.write_mem(0xFF24, 0x77);
+    sharedMemory.write_mem(0xFF25, 0xF3);
+    sharedMemory.write_mem(0xFF26, 0xF1);
+    sharedMemory.write_mem(0xFF40, 0x91);
+    sharedMemory.write_mem(0xFF41, 0x85);
+    sharedMemory.write_mem(0xFF42, 0x00);
+    sharedMemory.write_mem(0xFF43, 0x00);
+    sharedMemory.write_mem(0xFF44, 0x00);
+    sharedMemory.write_mem(0xFF45, 0x00);
+    sharedMemory.write_mem(0xFF46, 0xFF);
+    sharedMemory.write_mem(0xFF47, 0xFC);
+    sharedMemory.write_mem(0xFF48, 0x00); //may also be FF
+    sharedMemory.write_mem(0xFF49, 0x00); //may also be FF
+    sharedMemory.write_mem(0xFF4A, 0x00);
+    sharedMemory.write_mem(0xFF4B, 0x00);
+    sharedMemory.write_mem(0xFF4D, 0xFF);
+    sharedMemory.write_mem(0xFF4F, 0xFF);
+    sharedMemory.write_mem(0xFF50, 0xFF); // if nonzero, bootrom is disabled
+    sharedMemory.write_mem(0xFF51, 0xFF);
+    sharedMemory.write_mem(0xFF52, 0xFF);
+    sharedMemory.write_mem(0xFF53, 0xFF);
+    sharedMemory.write_mem(0xFF54, 0xFF);
+    sharedMemory.write_mem(0xFF55, 0xFF);
+    sharedMemory.write_mem(0xFF56, 0xFF);
+    sharedMemory.write_mem(0xFF68, 0xFF);
+    sharedMemory.write_mem(0xFF69, 0xFF);
+    sharedMemory.write_mem(0xFF6A, 0xFF);
+    sharedMemory.write_mem(0xFF6B, 0xFF);
+    sharedMemory.write_mem(0xFF70, 0xFF);
+    sharedMemory.write_mem(0xFFFF, 0x00); //IE register - interrupts
 
     timer_counter = 1024;
     divider_counter = 0;
-
-    //load boot rom
-    //open file as binary stream and move file pointer to end
-    /*std::ifstream file("mgb_boot.bin", std::ios::binary | std::ios::ate);
-
-    if(file.is_open())
-    {
-        char* buffer = new char[256];
-
-        //go back to beginning of file and fill buffer
-        file.seekg(0, std::ios::beg);
-        file.read(buffer, 256);
-        file.close();
-
-        //load ROM contents into the gb's memory, starting at 0x0
-        for (int i = 0; i < 256; i++)
-        {
-            bootrom[i] = buffer[i];
-        }
-
-        //free the buffer
-        delete[] buffer;
-    }*/
-
 }
-/*
-void gb::LoadROM(const char *filename)
-{
-    //open file as binary stream and move file pointer to end
-    std::ifstream file(filename, std::ios::binary | std::ios::ate);
 
-    if(file.is_open())
-    {
-        //get size of file and allocate a buffer to hold the contents
-        std::streampos size = file.tellg();
-        char* buffer = new char[size];
-
-        //go back to beginning of file and fill buffer
-        file.seekg(0, std::ios::beg);
-        file.read(buffer, size);
-        file.close();
-
-        //load ROM contents into the gb's memory, starting at 0x00
-        for (int i = 0; i < size; i++)
-        {
-            cartridge_rom[i] = buffer[i];
-        }
-
-        //free the buffer
-        delete[] buffer;
-
-        //copy the first 0x8000 bytes into RAM
-        for (int i = 0; i < size; i++)
-        {
-            memory[i] = cartridge_rom[i];
-        }
-    }
-}*/
 
 bool gb::any_interrupts() {
     //checks for and handles interrupts
@@ -189,7 +133,7 @@ void gb::CPU_execute_op() {
         //fetch instruction
         opcode = sharedMemory.read_mem(PC);
         //output for debug
-        std::printf("pc: %x\topcode: %x\n", PC, opcode);
+        //std::printf("pc: %x\topcode: %x\n", PC, opcode);
 
         //increment pc before doing anything
         PC++;
@@ -869,11 +813,12 @@ void gb::OP_rot_shift_A(uint8_t xxx) {
 void gb::OP_ADD_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     set_N(false);
     set_H((A & 0xF + val & 0xF) > 0xF);
     set_C(((uint16_t)A + (uint16_t)(val)) > 0xFF);
@@ -886,11 +831,12 @@ void gb::OP_ADD_r(uint8_t xxx) {
 void gb::OP_ADC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     set_N(false);
     set_H((A & 0xF + val & 0xF + get_C()) > 0xF);
     set_C(((uint16_t)A + (uint16_t)val + get_C()) > 0xFF);
@@ -903,11 +849,12 @@ void gb::OP_ADC_r(uint8_t xxx) {
 void gb::OP_SUB_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     set_N(true);
     set_H((A & 0xF) < (val & 0xF));
     set_C(A < val);
@@ -920,11 +867,12 @@ void gb::OP_SUB_r(uint8_t xxx) {
 void gb::OP_SBC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     set_N(true);
     set_H((A & 0xF) < (val & 0xF + get_C()));
     set_C(A < (val + get_C()));
@@ -937,11 +885,12 @@ void gb::OP_SBC_r(uint8_t xxx) {
 void gb::OP_AND_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     A &= val;
     set_Z(A==0x00);
     set_N(false);
@@ -954,11 +903,12 @@ void gb::OP_AND_r(uint8_t xxx) {
 void gb::OP_OR_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     A |= val;
     set_Z(A==0x00);
     set_N(false);
@@ -971,11 +921,12 @@ void gb::OP_OR_r(uint8_t xxx) {
 void gb::OP_XOR_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     A ^= val;
     set_Z(A==0x00);
     set_N(false);
@@ -988,11 +939,12 @@ void gb::OP_XOR_r(uint8_t xxx) {
 void gb::OP_CP_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
-    uint8_t val = *reg;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
+    else val = *reg;
     uint8_t compare_val;
     compare_val = A - val;
     set_Z(compare_val==0x00);
@@ -1220,9 +1172,9 @@ void gb::OP_JP_test(uint8_t xx) {
     uint16_t address;
     address = sharedMemory.read_mem(PC++);
     address += (sharedMemory.read_mem(PC++) << 8);
-    printf("JR cc %X\n", address);
+    //printf("JR cc %X\n", address);
     if(test_condition(xx)){
-        printf("Jumping now...\n");
+        //printf("Jumping now...\n");
         PC = address;
         delay++;
     }
@@ -1242,9 +1194,9 @@ void gb::OP_JR_test(uint8_t cc) {
     uint8_t delay = 2;
     uint16_t offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
-    printf("JR (jump relative) cc %X\n", offset);
+    //printf("JR (jump relative) cc %X\n", offset);
     if(test_condition(cc)){
-        printf("Jumping now...\n");
+        //printf("Jumping now...\n");
         PC = PC + offset;
         delay++;
     }
@@ -1256,7 +1208,7 @@ void gb::OP_CALL() {
     uint16_t address;
     address = sharedMemory.read_mem(PC++);
     address += (sharedMemory.read_mem(PC++) << 8);
-    printf("CALL %X, pushing %X onto stack\n", address, PC);
+    //printf("CALL %X, pushing %X onto stack\n", address, PC);
     SP--;
     write_mem(SP--, (PC >> 8));
     write_mem(SP, (PC & 0xFF));
@@ -1284,7 +1236,7 @@ void gb::OP_CALL_test(uint8_t xx) {
 void gb::OP_RET() {
     uint16_t newPC = sharedMemory.read_mem(SP++);
     newPC += (sharedMemory.read_mem(SP++) << 8);
-    printf("RET %X\n", newPC);
+    //printf("RET %X\n", newPC);
     PC = newPC;
     cyclecount += 4;
     cycle_delay(4);
@@ -1647,7 +1599,7 @@ void gb::cycle_delay(uint8_t cycles) {
     {
         clock.restart();
         cycles_ran = 0;
-        while(clock.getElapsedTime().asMilliseconds() < 1); //yep, just NOP
+        //while(clock.getElapsedTime().asMilliseconds() < 1); //yep, just NOP
     }
 }
 

@@ -113,7 +113,7 @@ public:
                     }
                     break;
 
-                    case SDL_KEYUP: {
+                    case sf::Event::KeyReleased: {
                         switch (event.key.code) {
                             case sf::Keyboard::Key::Return: //start
                             {

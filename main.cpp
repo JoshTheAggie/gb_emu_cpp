@@ -1,6 +1,4 @@
 #include <iostream>
-#include <chrono>
-#include <SDL2/SDL.h>
 #include "gb.h"
 #include "platform.h"
 #include "memory.h"
@@ -23,7 +21,6 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
     gb cpu{};
     sharedMemory.LoadROM(romFileName);
 
-    auto lastCycleTime = std::chrono::high_resolution_clock::now();
     bool quit = false;
 
     const int MAXCYCLES = 69905;

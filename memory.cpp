@@ -84,12 +84,6 @@ uint8_t memory::read_mem(uint16_t address) {
     {
         return bootrom[address];
     }
-    else if (address == 0xFF44)
-    {
-        //purely here for debug breakpoint
-        printf("scanline register: %d\n", system_mem[address]);
-        return system_mem[address];
-    }
     else //todo: more banking shiz
         return system_mem[address];
 }

@@ -3,6 +3,6 @@ project(gbemuJM)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(gbemuJM main.cpp platform.h gb.h gb.cpp ppu.cpp ppu.h)
+add_executable(gbemuJM main.cpp platform.h gb.h gb.cpp ppu.cpp ppu.h memory.cpp memory.h)
 target_compile_features(gbemuJM PRIVATE cxx_std_14)
 target_link_libraries(gbemuJM PRIVATE sfml-graphics sfml-window sfml-system)

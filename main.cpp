@@ -43,7 +43,6 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
             oldCycles = cpu.cycles_since_last_screen;
         }
         cpu.cycles_since_last_screen = 0;
-        //todo: render_screen()
         platform.Update(cpu.video);
 
     }

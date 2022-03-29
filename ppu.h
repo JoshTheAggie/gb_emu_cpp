@@ -17,6 +17,8 @@
 #define WY memory[0xFF4A]
 #define WX memory[0xFF4B]
 
+enum COLOR {BLACK, DARK_GRAY, LIGHT_GRAY, WHITE};
+
 class ppu {
     //need a pointer to the memory of the SOC
     uint8_t *memory;
@@ -34,13 +36,17 @@ class ppu {
     // 10 lines of V-blank
 
     // 114x154 = 17556 clocks per screen. At 1MHz, that's 59.7 Hz refresh
+
+    void render_tiles();
+    void render_sprites();
+    static bool testbit(uint8_t num, uint8_t data);
+    uint8_t getbitvalue(uint8_t num, uint8_t data);
+    COLOR get_color(int colornum, uint16_t palette_address);
+
 public:
     ppu(uint8_t* mem, uint32_t* video);
 
-    void oam_search();
     void draw_scanline();
-    void h_blank();
-    void check_lyc();
     void setLCDstatus();
 
     void write_from_CPU(uint16_t address, uint8_t data); //if locked, silently fail
@@ -49,7 +55,6 @@ public:
     void update_graphics(uint32_t cycles);
 
 private:
-    int line_count = 0;
     int scanline_counter = 0;
 
     //LCD Control register

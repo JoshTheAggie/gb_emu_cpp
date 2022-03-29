@@ -23,7 +23,7 @@ class gb {
     uint8_t bootrom [256]{}; //256 byte bootstrap
     uint8_t cartridge_rom [0x200000]{}; //cartridge rom
 
-    ppu * gpu;
+
     /*
   0000-3FFF   16KB ROM Bank 00     (in cartridge, fixed at bank 00)
   4000-7FFF   16KB ROM Bank 01..NN (in cartridge, switchable bank number)
@@ -173,6 +173,7 @@ class gb {
     void performDMAtransfer(uint8_t data);
 public:
     //graphics
+    ppu * gpu;
     uint32_t video [VIDEO_WIDTH * VIDEO_HEIGHT]{};
 
     uint8_t directions{0xFF}, buttons{0xFF};

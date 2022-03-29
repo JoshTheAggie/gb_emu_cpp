@@ -7,7 +7,7 @@
 
 
 #include <cstdint>
-#include <cstdio>
+#include <iostream>
 #include <fstream>
 
 class memory {

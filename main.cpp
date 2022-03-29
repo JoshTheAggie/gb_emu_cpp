@@ -20,7 +20,9 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
 
     gb cpu{};
     sharedMemory.LoadROM(romFileName);
-
+    std::printf("Loaded ROM image ");
+    std::printf(romFileName);
+    std::printf("\n");
     bool quit = false;
 
     const int MAXCYCLES = 69905;

@@ -26,6 +26,10 @@ memory::memory() {
         //free the buffer
         delete[] buffer;
     }
+    else
+    {
+        std::cerr << "Cannot load boot rom!\n";
+    }
 }
 
 void memory::write_mem(uint16_t address, uint8_t value) {
@@ -99,6 +103,9 @@ void memory::performDMAtransfer(uint8_t data) {
 void memory::LoadROM(const char *filename) {
     //open file as binary stream and move file pointer to end
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
+    /*std::printf("Opening rom file ");
+    std::printf(filename);
+    std::printf(".\n");*/
 
     if(file.is_open())
     {
@@ -121,12 +128,16 @@ void memory::LoadROM(const char *filename) {
         delete[] buffer;
 
         //copy the first 0x8000 bytes into RAM
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < 0x8000; i++)
         {
             if(i >= size) system_mem[i] = 0x00;
             else
                 system_mem[i] = cartridge_rom[i];
         }
+    }
+    else
+    {
+        std::cerr << "Cannot open ROM file!\n";
     }
 }
 

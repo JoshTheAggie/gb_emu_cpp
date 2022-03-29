@@ -76,7 +76,7 @@ gb::gb()
     sharedMemory.write_mem(0xFF4B, 0x00);
     sharedMemory.write_mem(0xFF4D, 0xFF);
     sharedMemory.write_mem(0xFF4F, 0xFF);
-    sharedMemory.write_mem(0xFF50, 0xFF); // if nonzero, bootrom is disabled
+    sharedMemory.write_mem(0xFF50, 0x00); // if nonzero, bootrom is disabled
     sharedMemory.write_mem(0xFF51, 0xFF);
     sharedMemory.write_mem(0xFF52, 0xFF);
     sharedMemory.write_mem(0xFF53, 0xFF);
@@ -136,7 +136,7 @@ void gb::CPU_execute_op() {
         //std::printf("pc: %x\topcode: %x\n", PC, opcode);
 
         //increment pc before doing anything
-        PC++;
+        PC++; while (PC == 0xF1);
 
         if (CB_instruction) {
             cyclecount += 1;

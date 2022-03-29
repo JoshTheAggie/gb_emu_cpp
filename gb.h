@@ -6,6 +6,7 @@
 #include <fstream>
 #include <string>
 #include "ppu.h"
+#include "memory.h"
 #include <SFML/System/Clock.hpp>
 
 #ifndef GBEMUJM_GB_H
@@ -14,14 +15,16 @@
 const unsigned int VIDEO_WIDTH = 160;
 const unsigned int VIDEO_HEIGHT = 144;
 
+extern memory sharedMemory;
+
 class gb {
     sf::Clock clock;
     //used for CPU speed regulation
     uint32_t cycles_ran = 0;
     uint8_t opcode;          //8-bit instructions
-    uint8_t memory [0x10000]{};    //64KiB of memory
-    uint8_t bootrom [256]{}; //256 byte bootstrap
-    uint8_t cartridge_rom [0x200000]{}; //cartridge rom
+    //uint8_t memory [0x10000]{};    //64KiB of memory
+    //uint8_t bootrom [256]{}; //256 byte bootstrap
+    //uint8_t cartridge_rom [0x200000]{}; //cartridge rom
 
 
     /*
@@ -155,7 +158,7 @@ class gb {
     //makes it much easier to go back and add banking
     //for now will be basic
     void write_mem(uint16_t address, uint8_t value);
-    uint8_t read_mem(uint16_t address);
+    //uint8_t read_mem(uint16_t address);
 
     //helper functions for registers
     uint8_t * decode_register(uint8_t xxx);
@@ -170,16 +173,16 @@ class gb {
     int32_t divider_counter;
 
     //DMA transfer
-    void performDMAtransfer(uint8_t data);
+    //void performDMAtransfer(uint8_t data);
 public:
     //graphics
     ppu * gpu;
     uint32_t video [VIDEO_WIDTH * VIDEO_HEIGHT]{};
 
-    uint8_t directions{0xFF}, buttons{0xFF};
+    //uint8_t directions{0xFF}, buttons{0xFF};
 
     gb();
-    void LoadROM(char const *filename);
+    //void LoadROM(char const *filename);
     void CPU_execute_op();
     void update_joypad_reg();
     uint32_t cycles_since_last_screen;

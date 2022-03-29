@@ -3,6 +3,9 @@
 #include <SDL2/SDL.h>
 #include "gb.h"
 #include "platform.h"
+#include "memory.h"
+
+memory sharedMemory;
 
 int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM name
     if(argc != 4)
@@ -18,7 +21,7 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
     Platform platform("Joshua Mashburn's GB Emu", VIDEO_WIDTH * videoScale, VIDEO_HEIGHT * videoScale, VIDEO_WIDTH, VIDEO_HEIGHT, videoScale);
 
     gb cpu{};
-    cpu.LoadROM(romFileName);
+    sharedMemory.LoadROM(romFileName);
 
     auto lastCycleTime = std::chrono::high_resolution_clock::now();
     bool quit = false;
@@ -34,7 +37,7 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
         //if (dt > cycleDelay){
             //lastCycleTime = currentTime;
         while ((cpu.cycles_since_last_screen < MAXCYCLES) && !quit) {
-            quit = platform.ProcessInput(cpu.directions, cpu.buttons);
+            quit = platform.ProcessInput(sharedMemory.directions, sharedMemory.buttons);
             cpu.update_joypad_reg();
             cpu.CPU_execute_op();
             deltaCycles = cpu.cycles_since_last_screen - oldCycles;

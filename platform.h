@@ -3,6 +3,7 @@
 //
 
 #include <SFML/Graphics.hpp>
+#include "memory.h"
 
 #ifndef GBEMUJM_PLATFORM_H
 #define GBEMUJM_PLATFORM_H

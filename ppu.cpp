@@ -4,8 +4,7 @@
 
 #include "ppu.h"
 
-ppu::ppu(uint8_t *mem, uint32_t *video) {
-    memory = mem;
+ppu::ppu(uint32_t *video) {
     display = video;
 }
 
@@ -21,19 +20,20 @@ void ppu::update_graphics(uint32_t cycles) {
     if(scanline_counter <= 0)
     {
         //time to move to next scanline
-        LY++;
-        uint8_t currentline = memory[0xFF44];
+        sharedMemory.write_mem(0xFF44, LY+1);
+        uint8_t currentline = LY;
 
         scanline_counter = 456; //456 CPU cycles per scanline
 
         //vertical blank?
         if (currentline == 144)
         {
-            memory[0xFF0F] |= 0x01; //bit 0 VBLANK set
+            //bit 0 VBLANK set
+            sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F)|0x01));
         }
         else if (currentline > 153)
         {
-            memory[0xFF44] = 0;
+            sharedMemory.write_mem(0xFF44, 0x00);
         }
         else if (currentline < 144)
             draw_scanline();
@@ -41,7 +41,7 @@ void ppu::update_graphics(uint32_t cycles) {
 }
 
 void ppu::draw_scanline() {
-    uint8_t control = memory[0xFF40];
+    uint8_t control = sharedMemory.read_mem(0xFF40);
     if(testbit(0, control)) // is bit 0 on?
     {
         render_tiles();
@@ -53,15 +53,15 @@ void ppu::draw_scanline() {
 }
 
 void ppu::setLCDstatus() {
-    uint8_t status = memory[0xFF41];
+    uint8_t status = sharedMemory.read_mem(0xFF41);
     if(!display_enabled())
     {
         //set the mode to 1 during lcd disabled, set scanline to 0
         scanline_counter = 456;
-        LY = 0x00;
+        sharedMemory.write_mem(0xFF44, 0x00);
         status &= 0xFC; //clear bits 1,0
         status |= 0x01; //set bit 0
-        memory[0xFF41] = status;
+        sharedMemory.write_mem(0xFF41, status);
         return;
     }
 
@@ -110,7 +110,8 @@ void ppu::setLCDstatus() {
     //if changing modes request interrupt
     if(requestInt && (mode != currentmode))
     {
-        memory[0xFF0F] |= 0x02; //bit 1 LCDSTAT set - interrupt
+        //bit 1 LCDSTAT set - interrupt
+        sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F)|0x02));
     }
 
     //check the coincidence flag
@@ -118,13 +119,14 @@ void ppu::setLCDstatus() {
     {
         status |= 0x04; //set bit 2
         if (testbit(6, status)) //if bit 6 is on
-            memory[0xFF0F] |= 0x02; //bit 1 LCDSTAT set - interrupt
+            //bit 1 LCDSTAT set - interrupt
+            sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F)|0x02));
     }
     else
     {
         status &= 0xFB; //reset bit 2
     }
-    memory[0xFF41] = status;
+    sharedMemory.write_mem(0xFF41, status);
 }
 
 bool ppu::testbit(uint8_t num, uint8_t data) {
@@ -211,8 +213,8 @@ void ppu::render_tiles() {
 
         //get the tile ID. remember it can be signed or unsigned
         uint16_t tileAddress = backgroundMemory + tileRow + tileCol;
-        if(unsig) tileNum = (uint8_t)memory[tileAddress]; //todo: make this use readmem
-        else tileNum = (int8_t)memory[tileAddress];
+        if(unsig) tileNum = (uint8_t)sharedMemory.read_mem(tileAddress);
+        else tileNum = (int8_t)sharedMemory.read_mem(tileAddress);
 
         //where's this tile ID in memory?
         uint16_t tileLocation = tileData;
@@ -222,8 +224,8 @@ void ppu::render_tiles() {
         //find the correct vertical line we're on of the tile to get the tile data
         uint8_t line = ypos % 8;
         line *= 2; //each line takes 2 bytes of memory
-        uint8_t data1 = memory[tileLocation + line];
-        uint8_t data2 = memory[tileLocation + line + 1];
+        uint8_t data1 = sharedMemory.read_mem(tileLocation + line);
+        uint8_t data2 = sharedMemory.read_mem(tileLocation + line + 1);
 
         //pixel 0 in the tile is bit 7 of data1 and data2
         //pixel 1 is bit 6, etc...
@@ -247,6 +249,7 @@ void ppu::render_tiles() {
             case WHITE: red = 0xFF; green = 0xFF; blue = 0xFF; break;
             case LIGHT_GRAY: red = 0xA9; green = 0xA9; blue = 0xA9; break;
             case DARK_GRAY: red = 0x84; green = 0x84; blue = 0x84; break;
+            default: break;
         }
 
         int finalY = LY;
@@ -271,7 +274,7 @@ uint8_t ppu::getbitvalue(uint8_t num, uint8_t data) {
 
 COLOR ppu::get_color(int colornum, uint16_t palette_address) {
     COLOR res = WHITE;
-    uint8_t palette = memory[palette_address];
+    uint8_t palette = sharedMemory.read_mem(palette_address);
     int hi = 0;
     int lo = 0;
 

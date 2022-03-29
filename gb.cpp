@@ -16,7 +16,7 @@ gb::gb()
     cycles_since_last_screen = 0;
 
     //instantiate PPU
-    gpu = new ppu(reinterpret_cast<uint8_t *>(&memory), reinterpret_cast<uint32_t *>(&video));
+    gpu = new ppu(reinterpret_cast<uint32_t *>(&video));
 
     //pandocs says these are the MGB initial values for the cpu regs
     A = 0xFF;
@@ -95,7 +95,7 @@ gb::gb()
 
     //load boot rom
     //open file as binary stream and move file pointer to end
-    std::ifstream file("mgb_boot.bin", std::ios::binary | std::ios::ate);
+    /*std::ifstream file("mgb_boot.bin", std::ios::binary | std::ios::ate);
 
     if(file.is_open())
     {
@@ -114,10 +114,10 @@ gb::gb()
 
         //free the buffer
         delete[] buffer;
-    }
+    }*/
 
 }
-
+/*
 void gb::LoadROM(const char *filename)
 {
     //open file as binary stream and move file pointer to end
@@ -149,13 +149,13 @@ void gb::LoadROM(const char *filename)
             memory[i] = cartridge_rom[i];
         }
     }
-}
+}*/
 
 bool gb::any_interrupts() {
     //checks for and handles interrupts
     if(!IME) return false;
     else{
-        uint8_t interrupts = read_mem(0xFFFF) & read_mem(0xFF0F);
+        uint8_t interrupts = sharedMemory.read_mem(0xFFFF) & sharedMemory.read_mem(0xFF0F);
         if(interrupts != 0){
             IME = false; //disable further interrupts
             uint16_t address;
@@ -178,8 +178,8 @@ bool gb::any_interrupts() {
 }
 
 void gb::request_interrupt(uint8_t irq_num) {
-    //I'm fine with this directly writing to memory
-    memory[0xFF0F] |= (0x01 << irq_num);
+    sharedMemory.write_mem(0xFF0F,
+                           (sharedMemory.read_mem(0xFF0F) | (0x01 << irq_num)));
 }
 
 void gb::CPU_execute_op() {
@@ -187,7 +187,7 @@ void gb::CPU_execute_op() {
     //TODO: ensure interrupt handler works
     if(!any_interrupts()) {
         //fetch instruction
-        opcode = read_mem(PC);
+        opcode = sharedMemory.read_mem(PC);
         //output for debug
         std::printf("pc: %x\topcode: %x\n", PC, opcode);
 
@@ -423,13 +423,13 @@ void gb::CPU_execute_op() {
 }
 
 void gb::update_joypad_reg() {
-    if(!(read_mem(0xFF00) & 0b00100000)) //if bit 5 is set 0
+    if(!(sharedMemory.read_mem(0xFF00) & 0b00100000)) //if bit 5 is set 0
     {
-        write_mem(0xFF00, ((read_mem(0xFF00) & 0xF0) + (directions & 0x0F)));
+        write_mem(0xFF00, ((sharedMemory.read_mem(0xFF00) & 0xF0) + (sharedMemory.directions & 0x0F)));
     }
-    else if(!(read_mem(0xFF00) & 0b00010000)) //if bit 4 is set 0
+    else if(!(sharedMemory.read_mem(0xFF00) & 0b00010000)) //if bit 4 is set 0
     {
-        write_mem(0xFF00, ((read_mem(0xFF00) & 0xF0) + (buttons & 0x0F)));
+        write_mem(0xFF00, ((sharedMemory.read_mem(0xFF00) & 0xF0) + (sharedMemory.buttons & 0x0F)));
     }
 }
 
@@ -463,13 +463,13 @@ void gb::set_C(bool condition) {
 
 void gb::OP_HALT() {
     //HALT: power down CPU until an interrupt
-    while (read_mem(0xFF0F) == 0) ;
+    while (sharedMemory.read_mem(0xFF0F) == 0) ;
 }
 
 void gb::OP_STOP() {
     //todo: handle LCD once implemented
     //STOP: halt CPU and LCD until button press
-    while (isbiton(4, read_mem(0xFF0F))) ;
+    while (isbiton(4, sharedMemory.read_mem(0xFF0F))) ;
 }
 
 void gb::OP_RST(uint8_t xxx) {
@@ -536,7 +536,7 @@ void gb::OP_LD_imm(uint8_t xxx) {
         destination = &memory[HL()];
         delay = 3;
     }
-    uint8_t imm = read_mem(PC++);
+    uint8_t imm = sharedMemory.read_mem(PC++);
     *destination = imm;
     cycles_since_last_screen += delay;
     cycle_delay(delay);
@@ -606,13 +606,13 @@ void gb::OP_LDH(uint8_t yyy) {
         address += C;
     else
     {
-        address += read_mem(PC++);
+        address += sharedMemory.read_mem(PC++);
         delay++;
     }
     if (isbiton(4, opcode))
     {
         //destination is A
-        A = read_mem(address);
+        A = sharedMemory.read_mem(address);
     }
     else
     {
@@ -625,8 +625,8 @@ void gb::OP_LDH(uint8_t yyy) {
 
 void gb::OP_LD_imm16(uint8_t xx) {
     uint16_t imm;
-    imm = read_mem(PC++);
-    imm += (read_mem(PC++) << 8);
+    imm = sharedMemory.read_mem(PC++);
+    imm += (sharedMemory.read_mem(PC++) << 8);
     switch (xx)
     {
         case 0:
@@ -649,8 +649,8 @@ void gb::OP_LD_imm16(uint8_t xx) {
 }
 
 void gb::OP_STORE_SP() {
-    uint16_t address = read_mem(PC++);
-    address += (read_mem(PC++) << 8);
+    uint16_t address = sharedMemory.read_mem(PC++);
+    address += (sharedMemory.read_mem(PC++) << 8);
     write_mem(address, (SP & 0xFF));
     write_mem(address+1, (SP >> 8));
     cycles_since_last_screen += 5;
@@ -973,11 +973,11 @@ void gb::OP_CP_r(uint8_t xxx) {
 
 void gb::OP_LD_mem16() {
     uint16_t address;
-    address = read_mem(PC++);
-    address += (read_mem(PC++) << 8);
+    address = sharedMemory.read_mem(PC++);
+    address += (sharedMemory.read_mem(PC++) << 8);
     if (isbiton(4, opcode)){
         //destination is A
-        A = read_mem(address);
+        A = sharedMemory.read_mem(address);
     }
     else
     {
@@ -1022,8 +1022,8 @@ void gb::OP_PUSH_r(uint8_t xx) {
 
 void gb::OP_POP_r(uint8_t xx) {
     uint16_t data;
-    data = read_mem(SP++);
-    data += (read_mem(SP++) << 8);
+    data = sharedMemory.read_mem(SP++);
+    data += (sharedMemory.read_mem(SP++) << 8);
     switch (xx) {
         case 0:
             write_BC(data);
@@ -1046,7 +1046,7 @@ void gb::OP_POP_r(uint8_t xx) {
 
 void gb::OP_LD_HL_SP_offset() {
     uint16_t offset;
-    offset = read_mem(PC++);
+    offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset))
         offset += 0xFF00;
     write_HL(SP + offset);
@@ -1060,7 +1060,7 @@ void gb::OP_LD_HL_SP_offset() {
 
 void gb::OP_ADD_SP() {
     uint16_t offset;
-    offset = read_mem(PC++);
+    offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset))
         offset += 0xFF00;
     set_Z(false);
@@ -1085,7 +1085,7 @@ void gb::OP_EI() {
 }
 
 void gb::OP_ADD_A_imm() {
-    uint8_t temp = read_mem(PC++);
+    uint8_t temp = sharedMemory.read_mem(PC++);
     set_N(false);
     set_H((A & 0xF + temp & 0xF) > 0xF);
     set_C(((uint16_t)A + (uint16_t)(temp)) > 0xFF);
@@ -1096,7 +1096,7 @@ void gb::OP_ADD_A_imm() {
 }
 
 void gb::OP_ADC_A_imm() {
-    uint8_t temp = read_mem(PC++);
+    uint8_t temp = sharedMemory.read_mem(PC++);
     set_N(false);
     set_H((A & 0xF + temp & 0xF + get_C()) > 0xF);
     set_C(((uint16_t)A + (uint16_t)(temp) + get_C()) > 0xFF);
@@ -1107,7 +1107,7 @@ void gb::OP_ADC_A_imm() {
 }
 
 void gb::OP_SUB_A_imm() {
-    uint8_t temp = read_mem(PC++);
+    uint8_t temp = sharedMemory.read_mem(PC++);
     set_N(true);
     set_H((A & 0xF) < (temp & 0xF));
     set_C((A < temp));
@@ -1118,7 +1118,7 @@ void gb::OP_SUB_A_imm() {
 }
 
 void gb::OP_SBC_A_imm() {
-    uint8_t temp = read_mem(PC++);
+    uint8_t temp = sharedMemory.read_mem(PC++);
     set_N(true);
     set_H((A & 0xF) < (temp & 0xF + get_C()));
     set_C((A < (temp + get_C())));
@@ -1129,7 +1129,7 @@ void gb::OP_SBC_A_imm() {
 }
 
 void gb::OP_AND_A_imm() {
-    A &= read_mem(PC++);
+    A &= sharedMemory.read_mem(PC++);
     set_Z(A == 0x00);
     set_N(false);
     set_H(true);
@@ -1139,7 +1139,7 @@ void gb::OP_AND_A_imm() {
 }
 
 void gb::OP_OR_A_imm() {
-    A |= read_mem(PC++);
+    A |= sharedMemory.read_mem(PC++);
     set_Z(A == 0x00);
     set_N(false);
     set_H(false);
@@ -1149,7 +1149,7 @@ void gb::OP_OR_A_imm() {
 }
 
 void gb::OP_XOR_A_imm() {
-    A ^= read_mem(PC++);
+    A ^= sharedMemory.read_mem(PC++);
     set_Z(A == 0x00);
     set_N(false);
     set_H(false);
@@ -1159,7 +1159,7 @@ void gb::OP_XOR_A_imm() {
 }
 
 void gb::OP_CP_A_imm() {
-    uint8_t temp = read_mem(PC++);
+    uint8_t temp = sharedMemory.read_mem(PC++);
     set_N(true);
     set_H((A & 0xF) < (temp & 0xF));
     set_C((A < temp));
@@ -1170,8 +1170,8 @@ void gb::OP_CP_A_imm() {
 
 void gb::OP_JP() {
     uint16_t address;
-    address = read_mem(PC++);
-    address += (read_mem(PC++) << 8);
+    address = sharedMemory.read_mem(PC++);
+    address += (sharedMemory.read_mem(PC++) << 8);
     PC = address;
     cycles_since_last_screen += 4;
     cycle_delay(4);
@@ -1186,8 +1186,8 @@ void gb::OP_JP_HL() {
 void gb::OP_JP_test(uint8_t xx) {
     uint8_t delay = 3;
     uint16_t address;
-    address = read_mem(PC++);
-    address += (read_mem(PC++) << 8);
+    address = sharedMemory.read_mem(PC++);
+    address += (sharedMemory.read_mem(PC++) << 8);
     printf("JR cc %X\n", address);
     if(test_condition(xx)){
         printf("Jumping now...\n");
@@ -1199,7 +1199,7 @@ void gb::OP_JP_test(uint8_t xx) {
 }
 
 void gb::OP_JR() {
-    uint16_t offset = read_mem(PC++);
+    uint16_t offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
     PC = PC + offset;
     cycles_since_last_screen += 3;
@@ -1208,7 +1208,7 @@ void gb::OP_JR() {
 
 void gb::OP_JR_test(uint8_t cc) {
     uint8_t delay = 2;
-    uint16_t offset = read_mem(PC++);
+    uint16_t offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
     printf("JR (jump relative) cc %X\n", offset);
     if(test_condition(cc)){
@@ -1222,8 +1222,8 @@ void gb::OP_JR_test(uint8_t cc) {
 
 void gb::OP_CALL() {
     uint16_t address;
-    address = read_mem(PC++);
-    address += (read_mem(PC++) << 8);
+    address = sharedMemory.read_mem(PC++);
+    address += (sharedMemory.read_mem(PC++) << 8);
     printf("CALL %X, pushing %X onto stack\n", address, PC);
     SP--;
     write_mem(SP--, (PC >> 8));
@@ -1236,8 +1236,8 @@ void gb::OP_CALL() {
 void gb::OP_CALL_test(uint8_t xx) {
     uint8_t delay = 3;
     uint16_t address;
-    address = read_mem(PC++);
-    address += (read_mem(PC++) << 8);
+    address = sharedMemory.read_mem(PC++);
+    address += (sharedMemory.read_mem(PC++) << 8);
     if(test_condition(xx)) {
         SP--;
         write_mem(SP--, (PC >> 8));
@@ -1250,8 +1250,8 @@ void gb::OP_CALL_test(uint8_t xx) {
 }
 
 void gb::OP_RET() {
-    uint16_t newPC = read_mem(SP++);
-    newPC += (read_mem(SP++) << 8);
+    uint16_t newPC = sharedMemory.read_mem(SP++);
+    newPC += (sharedMemory.read_mem(SP++) << 8);
     printf("RET %X\n", newPC);
     PC = newPC;
     cycles_since_last_screen += 4;
@@ -1263,8 +1263,8 @@ void gb::OP_RET_test(uint8_t xx) {
     if(test_condition(xx))
     {
         delay += 3;
-        uint16_t newPC = read_mem(SP++);
-        newPC += (read_mem(SP++) << 8);
+        uint16_t newPC = sharedMemory.read_mem(SP++);
+        newPC += (sharedMemory.read_mem(SP++) << 8);
         PC = newPC;
     }
     cycles_since_last_screen += delay;
@@ -1272,8 +1272,8 @@ void gb::OP_RET_test(uint8_t xx) {
 }
 
 void gb::OP_RETI() {
-    uint16_t newPC = read_mem(SP++);
-    newPC += (read_mem(SP++) << 8);
+    uint16_t newPC = sharedMemory.read_mem(SP++);
+    newPC += (sharedMemory.read_mem(SP++) << 8);
     PC = newPC;
     IME = true;
     cycles_since_last_screen += 4;
@@ -1285,7 +1285,7 @@ void gb::CB_RLC(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
 
         tempHi = temp << 1;
         temp = temp >> 7;
@@ -1316,7 +1316,7 @@ void gb::CB_RL(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
 
         tempHi = temp << 1;
         temp = temp >> 7;
@@ -1347,7 +1347,7 @@ void gb::CB_RRC(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
 
         tempHi = temp << 7;
         temp = temp >> 1;
@@ -1378,7 +1378,7 @@ void gb::CB_RR(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
 
         tempHi = temp << 7;
         temp = temp >> 1;
@@ -1409,7 +1409,7 @@ void gb::CB_SLA(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
 
         result = temp << 1;
 
@@ -1436,7 +1436,7 @@ void gb::CB_SRA(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
 
         result = temp >> 1;
         if (isbiton(7, temp))
@@ -1467,7 +1467,7 @@ void gb::CB_SWAP(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
         tempHi = temp << 4;
         temp = temp >> 4;
         result = temp + tempHi;
@@ -1494,7 +1494,7 @@ void gb::CB_SRL(uint8_t xxx) {
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
 
         result = temp >> 1;
 
@@ -1521,7 +1521,7 @@ void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
     uint8_t temp;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
         delay = 4;
     }
     else {
@@ -1539,7 +1539,7 @@ void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
     uint8_t temp;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
         temp |= (0x01 << bbb);
         write_mem(HL(), temp);
         delay = 4;
@@ -1559,7 +1559,7 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
     uint8_t temp;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
-        temp = read_mem(HL());
+        temp = sharedMemory.read_mem(HL());
         temp &= ~(0x01 << bbb);
         write_mem(HL(), temp);
         delay = 4;
@@ -1575,48 +1575,17 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
 }
 
 void gb::write_mem(uint16_t address, uint8_t value) {
-    //todo: implement rom banking, any other indirection, etc.
-    //todo: go back and replace all the memory[] writes
-    //don't allow writes to read-only memory
-    if (address < 0x8000)
-    {
-        printf("Attempted write to ROM, address %x\n", address);
-    }
-    // writes to ECHO RAM writes to RAM as well
-    else if ((address >= 0xE000) && (address < 0xFE00))
-    {
-        memory[address] = value;
-        write_mem(address-0x2000, value);
-    }
-    //this area is restricted
-    else if (( address >= 0xFEA0 ) && (address < 0xFEFF))
-    {
-        printf("Attempted write to restricted memory, address %x\n", address);
-    }
-    else if (address == 0xFF07)
+    if (address == 0xFF07)
     {
         //update timer controller!
-        memory[0xFF07] = value;
+        sharedMemory.write_mem(address, value);
         set_clock_freq();
     }
-    else if (address == 0xFF04){
-        //attempted write to timer div register, resets it
-        memory[0xFF04] = 0;
-    }
-    else if (address == 0xFF44)
-    {
-        //attempted write to scanline counter, resets it
-        memory[address] = 0;
-    }
-    else if (address == 0xFF46)
-    {
-        //DMA time
-        performDMAtransfer(value);
-    }
     else
-        memory[address] = value;
+        sharedMemory.write_mem(address, value);
 }
 
+/*
 uint8_t gb::read_mem(uint16_t address) {
     //todo: go back and replace all the '&memory[HL()]' calls
     if (address == 0xFF00){
@@ -1638,7 +1607,7 @@ uint8_t gb::read_mem(uint16_t address) {
     }
     else //todo: more banking shiz
         return memory[address];
-}
+}*/
 
 uint8_t *gb::decode_register(uint8_t xxx) {
     switch (xxx)
@@ -1765,14 +1734,14 @@ void gb::update_timers(uint32_t cycles) {
             set_clock_freq();
 
             //is timer about to overflow?
-            if(read_mem(0xFF05) == 255)
+            if(sharedMemory.read_mem(0xFF05) == 255)
             {
-                write_mem(0xFF05, read_mem(0xFF06));
+                write_mem(0xFF05, sharedMemory.read_mem(0xFF06));
                 request_interrupt(2);
             }
             else
             {
-                write_mem(0xFF05, (read_mem(0xFF05)+1));
+                write_mem(0xFF05, (sharedMemory.read_mem(0xFF05)+1));
             }
         }
     }
@@ -1780,7 +1749,7 @@ void gb::update_timers(uint32_t cycles) {
 }
 
 bool gb::isclockenabled() {
-    return isbiton(2, read_mem(0xFF07));
+    return isbiton(2, sharedMemory.read_mem(0xFF07));
 }
 
 void gb::handle_div_reg(uint32_t cycles) {
@@ -1788,12 +1757,12 @@ void gb::handle_div_reg(uint32_t cycles) {
     if(divider_counter >= 255)
     {
         divider_counter = 0;
-        memory[0xFF04]++;
+        sharedMemory.write_mem(0xFF04, sharedMemory.read_mem(0xFF04)+1);
     }
 }
 
 void gb::set_clock_freq() {
-    uint8_t freq = read_mem(0xFF07) & 0x03;
+    uint8_t freq = sharedMemory.read_mem(0xFF07) & 0x03;
     switch (freq)
     {
         case 0: timer_counter = 1024;
@@ -1803,6 +1772,7 @@ void gb::set_clock_freq() {
     }
 }
 
+/*
 void gb::performDMAtransfer(uint8_t data) {
     //copies 0xA0 bytes into sprite RAM.
     //source address is the data originally attempted to write to 0xFF46 * 0x100
@@ -1811,6 +1781,4 @@ void gb::performDMAtransfer(uint8_t data) {
     {
         write_mem(0xFE00+i, read_mem(address+i));
     }
-}
-
-
+}*/

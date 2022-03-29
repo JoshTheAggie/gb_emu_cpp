@@ -47,12 +47,6 @@ void memory::write_mem(uint16_t address, uint8_t value) {
     {
         printf("Attempted write to restricted memory, address %x\n", address);
     }
-    else if (address == 0xFF07)
-    {
-        //update timer controller!
-        system_mem[0xFF07] = value;
-        set_clock_freq();
-    }
     else if (address == 0xFF04){
         //attempted write to timer div register, resets it
         system_mem[0xFF04] = 0;

@@ -23,6 +23,7 @@ public:
     uint8_t read_mem(uint16_t address);
     void performDMAtransfer(uint8_t data);
     void LoadROM(char const *filename);
+    void incrementLY();
 };
 
 

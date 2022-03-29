@@ -9,7 +9,7 @@ ppu::ppu(uint32_t *video) {
 }
 
 
-void ppu::update_graphics(uint32_t cycles) {
+void ppu::update_graphics(int32_t cycles) {
     setLCDstatus();
 
     if(display_enabled())
@@ -20,7 +20,7 @@ void ppu::update_graphics(uint32_t cycles) {
     if(scanline_counter <= 0)
     {
         //time to move to next scanline
-        sharedMemory.write_mem(0xFF44, LY+1);
+        sharedMemory.incrementLY();
         uint8_t currentline = LY;
 
         scanline_counter = 456; //456 CPU cycles per scanline
@@ -50,6 +50,7 @@ void ppu::draw_scanline() {
     {
         render_sprites();
     }
+    //sharedMemory.write_mem(0xFF44, (sharedMemory.read_mem(0xFF44)+1));
 }
 
 void ppu::setLCDstatus() {

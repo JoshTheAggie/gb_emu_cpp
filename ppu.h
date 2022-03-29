@@ -50,7 +50,7 @@ public:
     void draw_scanline();
     void setLCDstatus();
 
-    void update_graphics(uint32_t cycles);
+    void update_graphics(int32_t cycles);
 
 private:
     int scanline_counter = 0;

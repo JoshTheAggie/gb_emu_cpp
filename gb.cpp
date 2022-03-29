@@ -13,7 +13,7 @@ gb::gb()
     enable_interrupts = false;
     disable_interrupts = false;
     opcode = 0;
-    cycles_since_last_screen = 0;
+    cyclecount = 0;
 
     //instantiate PPU
     gpu = new ppu(reinterpret_cast<uint32_t *>(&video));
@@ -195,7 +195,7 @@ void gb::CPU_execute_op() {
         PC++;
 
         if (CB_instruction) {
-            cycles_since_last_screen += 1;
+            cyclecount += 1;
             cycle_delay(1);
             switch ((opcode & 0xF0u) >> 6) {
                 case 0: //00
@@ -503,48 +503,57 @@ void gb::OP_RST(uint8_t xxx) {
             break;
     }
     PC = reset;
-    cycles_since_last_screen += 8;
+    cyclecount += 8;
     cycle_delay(8);
 }
 
 void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
     uint8_t delay = 1;
     uint8_t * destination, * source;
-    if (xxx != 0x6)
-        destination = decode_register(xxx);
-    else {
-        destination = &memory[HL()];
-        delay = 2;
-    }
-    if (yyy != 0x6)
+    uint8_t val;
+
+    if (yyy != 0x6) {
         source = decode_register(yyy);
+        val = *source;
+    }
     else {
-        source = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
         delay = 2;
     }
-    *destination = *source;
-    cycles_since_last_screen += delay;
+    if (xxx != 0x6) {
+        destination = decode_register(xxx);
+        *destination = val;
+    }
+    else {
+        sharedMemory.write_mem(HL(), val);
+        delay = 2;
+    }
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_LD_imm(uint8_t xxx) {
     uint8_t delay = 2;
     uint8_t * destination;
-    if (xxx != 0x6)
+
+    uint8_t imm = sharedMemory.read_mem(PC++);
+
+    if (xxx != 0x6) {
         destination = decode_register(xxx);
+        *destination = imm;
+    }
     else {
-        destination = &memory[HL()];
+        sharedMemory.write_mem(HL(), imm);
         delay = 3;
     }
-    uint8_t imm = sharedMemory.read_mem(PC++);
-    *destination = imm;
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_LD_mem(uint8_t xxx) {
     uint8_t delay = 2;
     uint8_t * destination, * source;
+    uint8_t val;
     bool increment = false, decrement = false;
     if(xxx % 2 == 1)
     {
@@ -552,50 +561,49 @@ void gb::OP_LD_mem(uint8_t xxx) {
         destination = &A;
         switch (xxx) {
             case 1:
-                source = &memory[BC()];
+                val = sharedMemory.read_mem(BC());
                 break;
             case 3:
-                source = &memory[DE()];
+                val = sharedMemory.read_mem(DE());
                 break;
             case 5:
-                source = &memory[HL()];
+                val = sharedMemory.read_mem(HL());
                 increment = true;
                 break;
             case 7:
-                source = &memory[HL()];
+                val = sharedMemory.read_mem(HL());
                 decrement = true;
                 break;
             default:
                 source = nullptr;
         }
+        *destination = val;
     }
     else
     {
         //load from A to mem
-        source = &A;
         switch (xxx) {
             case 0:
-                destination = &memory[BC()];
+                sharedMemory.write_mem(BC(), A);
                 break;
             case 2:
-                destination = &memory[DE()];
+                sharedMemory.write_mem(DE(), A);
                 break;
             case 4:
-                destination = &memory[HL()];
+                sharedMemory.write_mem(HL(), A);
                 increment = true;
                 break;
             case 6:
-                destination = &memory[HL()];
+                sharedMemory.write_mem(HL(), A);
                 decrement = true;
                 break;
             default:
                 destination = nullptr;
         }
     }
-    *destination = *source;
     if (increment) inc_HL();
     if (decrement) dec_HL();
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -619,7 +627,7 @@ void gb::OP_LDH(uint8_t yyy) {
         //destination is mem
         write_mem(address, A);
     }
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -644,7 +652,7 @@ void gb::OP_LD_imm16(uint8_t xx) {
         default:
             break;
     }
-    cycles_since_last_screen += 3;
+    cyclecount += 3;
     cycle_delay(3);
 }
 
@@ -653,7 +661,7 @@ void gb::OP_STORE_SP() {
     address += (sharedMemory.read_mem(PC++) << 8);
     write_mem(address, (SP & 0xFF));
     write_mem(address+1, (SP >> 8));
-    cycles_since_last_screen += 5;
+    cyclecount += 5;
     cycle_delay(5);
 }
 
@@ -661,32 +669,49 @@ void gb::OP_INC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
     uint8_t temp;
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 3;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
+        temp = val;
+        val++;
+        sharedMemory.write_mem(HL(), val);
+        set_Z(val == 0);
     }
-    temp = *reg;
-    (*reg)++;
-    set_Z(*reg == 0);
+    else {
+        val = *reg;
+        temp = val;
+        (*reg)++;
+        set_Z(*reg == 0);
+    }
     set_N(false);
     set_H(((temp & 0xF) + 1) > 0xF);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_DEC_r(uint8_t xxx) {
-    uint8_t delay = 1, temp;
+    uint8_t delay = 1;
+    uint8_t temp;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val;
     if (xxx == 0x6) {
         delay = 3;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
+        temp = val;
+        val--;
+        sharedMemory.write_mem(HL(), val);
+        set_Z(val == 0);
     }
-    temp = *reg;
-    (*reg)--;
-    set_Z(*reg == 0);
+    else {
+        val = *reg;
+        temp = val;
+        (*reg)--;
+        set_Z(*reg == 0);
+    }
     set_N(true);
     set_H(((temp & 0xF)) == 0x00);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -717,7 +742,7 @@ void gb::OP_ADD16(uint8_t xx) {
         default:
             break;
     }
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -739,7 +764,7 @@ void gb::OP_INC16(uint8_t xx) {
         default:
             break;
     }
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -761,7 +786,7 @@ void gb::OP_DEC16(uint8_t xx) {
         default:
             break;
     }
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -774,14 +799,14 @@ void gb::OP_DAA() {
     set_Z(A == 0);
     set_H(false);
     set_C(tens > 9);
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     cycle_delay(1);
 }
 
 void gb::OP_CPL() {
     A = ~A;
     cycle_delay(1);
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     set_N(true);
     set_H(true);
 }
@@ -794,7 +819,7 @@ void gb::OP_CCF() {
         set_C(true);
     set_H(false);
     set_N(false);
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     cycle_delay(1);
 }
 
@@ -803,7 +828,7 @@ void gb::OP_SCF() {
     set_C(true);
     set_H(false);
     set_N(false);
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     cycle_delay(1);
 }
 
@@ -837,137 +862,144 @@ void gb::OP_rot_shift_A(uint8_t xxx) {
             break;
     }
     A = newA;
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     cycle_delay(1);
 }
 
 void gb::OP_ADD_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
     set_N(false);
-    set_H((A & 0xF + *reg & 0xF) > 0xF);
-    set_C(((uint16_t)A + (uint16_t)(*reg)) > 0xFF);
-    A += *reg;
+    set_H((A & 0xF + val & 0xF) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)(val)) > 0xFF);
+    A += val;
     set_Z(A == 0x00);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_ADC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
     set_N(false);
-    set_H((A & 0xF + *reg & 0xF + get_C()) > 0xF);
-    set_C(((uint16_t)A + (uint16_t)(*reg) + get_C()) > 0xFF);
-    A += *reg + get_C();
+    set_H((A & 0xF + val & 0xF + get_C()) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)val + get_C()) > 0xFF);
+    A += val + get_C();
     set_Z(A == 0x00);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_SUB_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
     set_N(true);
-    set_H((A & 0xF) < (*reg & 0xF));
-    set_C(A < (*reg));
-    A -= *reg;
+    set_H((A & 0xF) < (val & 0xF));
+    set_C(A < val);
+    A -= val;
     set_Z(A == 0x00);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_SBC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
     set_N(true);
-    set_H((A & 0xF) < (*reg & 0xF + get_C()));
-    set_C(A < (*reg + get_C()));
-    A -= *reg;
+    set_H((A & 0xF) < (val & 0xF + get_C()));
+    set_C(A < (val + get_C()));
     set_Z(A == 0x00);
-    A -= *reg - get_C();
-    cycles_since_last_screen += delay;
+    A -= (val + get_C());
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_AND_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
-    A &= *reg;
+    A &= val;
     set_Z(A==0x00);
     set_N(false);
     set_H(true);
     set_C(false);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_OR_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
-    A |= *reg;
+    A |= val;
     set_Z(A==0x00);
     set_N(false);
     set_H(false);
     set_C(false);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_XOR_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
-    A ^= *reg;
+    A ^= val;
     set_Z(A==0x00);
     set_N(false);
     set_H(false);
     set_C(false);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
 void gb::OP_CP_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
+    uint8_t val = *reg;
     if (xxx == 0x6) {
         delay = 2;
-        reg = &memory[HL()];
+        val = sharedMemory.read_mem(HL());
     }
     uint8_t compare_val;
-    compare_val = A - *reg;
+    compare_val = A - val;
     set_Z(compare_val==0x00);
     set_N(true);
-    set_H((A & 0xF) < (*reg & 0xF));
-    set_C(A < *reg);
-    cycles_since_last_screen += delay;
+    set_H((A & 0xF) < (val & 0xF));
+    set_C(A < val);
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -984,13 +1016,13 @@ void gb::OP_LD_mem16() {
         //destination is mem
         write_mem(address, A);
     }
-    cycles_since_last_screen += 4;
+    cyclecount += 4;
     cycle_delay(4);
 }
 
 void gb::OP_LD_SP_HL() {
     SP = HL();
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1016,7 +1048,7 @@ void gb::OP_PUSH_r(uint8_t xx) {
     write_mem(SP, (value >> 8));
     SP--;
     write_mem(SP, (value & 0xFF));
-    cycles_since_last_screen += 4;
+    cyclecount += 4;
     cycle_delay(4);
 }
 
@@ -1040,7 +1072,7 @@ void gb::OP_POP_r(uint8_t xx) {
         default:
             break;
     }
-    cycles_since_last_screen += 3;
+    cyclecount += 3;
     cycle_delay(3);
 }
 
@@ -1054,7 +1086,7 @@ void gb::OP_LD_HL_SP_offset() {
     set_N(false);
     set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
     set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
-    cycles_since_last_screen += 3;
+    cyclecount += 3;
     cycle_delay(3);
 }
 
@@ -1068,19 +1100,19 @@ void gb::OP_ADD_SP() {
     set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
     set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
     SP += offset;
-    cycles_since_last_screen += 4;
+    cyclecount += 4;
     cycle_delay(4);
 }
 
 void gb::OP_DI() {
     disable_interrupts = true;
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     cycle_delay(1);
 }
 
 void gb::OP_EI() {
     enable_interrupts = true;
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     cycle_delay(1);
 }
 
@@ -1091,7 +1123,7 @@ void gb::OP_ADD_A_imm() {
     set_C(((uint16_t)A + (uint16_t)(temp)) > 0xFF);
     A += temp;
     set_Z(A == 0x00);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1102,7 +1134,7 @@ void gb::OP_ADC_A_imm() {
     set_C(((uint16_t)A + (uint16_t)(temp) + get_C()) > 0xFF);
     A += temp + get_C();
     set_Z(A == 0x00);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1113,7 +1145,7 @@ void gb::OP_SUB_A_imm() {
     set_C((A < temp));
     A -= temp;
     set_Z(A == 0x00);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1124,7 +1156,7 @@ void gb::OP_SBC_A_imm() {
     set_C((A < (temp + get_C())));
     A -= (temp + get_C());
     set_Z(A == 0x00);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1134,7 +1166,7 @@ void gb::OP_AND_A_imm() {
     set_N(false);
     set_H(true);
     set_C(false);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1144,7 +1176,7 @@ void gb::OP_OR_A_imm() {
     set_N(false);
     set_H(false);
     set_C(false);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1154,7 +1186,7 @@ void gb::OP_XOR_A_imm() {
     set_N(false);
     set_H(false);
     set_C(false);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1164,7 +1196,7 @@ void gb::OP_CP_A_imm() {
     set_H((A & 0xF) < (temp & 0xF));
     set_C((A < temp));
     set_Z(A == temp);
-    cycles_since_last_screen += 2;
+    cyclecount += 2;
     cycle_delay(2);
 }
 
@@ -1173,13 +1205,13 @@ void gb::OP_JP() {
     address = sharedMemory.read_mem(PC++);
     address += (sharedMemory.read_mem(PC++) << 8);
     PC = address;
-    cycles_since_last_screen += 4;
+    cyclecount += 4;
     cycle_delay(4);
 }
 
 void gb::OP_JP_HL() {
     PC = HL();
-    cycles_since_last_screen += 1;
+    cyclecount += 1;
     cycle_delay(1);
 }
 
@@ -1194,7 +1226,7 @@ void gb::OP_JP_test(uint8_t xx) {
         PC = address;
         delay++;
     }
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1202,7 +1234,7 @@ void gb::OP_JR() {
     uint16_t offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
     PC = PC + offset;
-    cycles_since_last_screen += 3;
+    cyclecount += 3;
     cycle_delay(3);
 }
 
@@ -1216,7 +1248,7 @@ void gb::OP_JR_test(uint8_t cc) {
         PC = PC + offset;
         delay++;
     }
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1229,7 +1261,7 @@ void gb::OP_CALL() {
     write_mem(SP--, (PC >> 8));
     write_mem(SP, (PC & 0xFF));
     PC = address;
-    cycles_since_last_screen += 6;
+    cyclecount += 6;
     cycle_delay(6);
 }
 
@@ -1245,7 +1277,7 @@ void gb::OP_CALL_test(uint8_t xx) {
         PC = address;
         delay += 3;
     }
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1254,7 +1286,7 @@ void gb::OP_RET() {
     newPC += (sharedMemory.read_mem(SP++) << 8);
     printf("RET %X\n", newPC);
     PC = newPC;
-    cycles_since_last_screen += 4;
+    cyclecount += 4;
     cycle_delay(4);
 }
 
@@ -1267,7 +1299,7 @@ void gb::OP_RET_test(uint8_t xx) {
         newPC += (sharedMemory.read_mem(SP++) << 8);
         PC = newPC;
     }
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1276,7 +1308,7 @@ void gb::OP_RETI() {
     newPC += (sharedMemory.read_mem(SP++) << 8);
     PC = newPC;
     IME = true;
-    cycles_since_last_screen += 4;
+    cyclecount += 4;
     cycle_delay(4);
 }
 
@@ -1307,7 +1339,7 @@ void gb::CB_RLC(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1338,7 +1370,7 @@ void gb::CB_RL(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1369,7 +1401,7 @@ void gb::CB_RRC(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1400,7 +1432,7 @@ void gb::CB_RR(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1427,7 +1459,7 @@ void gb::CB_SLA(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1458,7 +1490,7 @@ void gb::CB_SRA(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1485,7 +1517,7 @@ void gb::CB_SWAP(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1512,7 +1544,7 @@ void gb::CB_SRL(uint8_t xxx) {
     set_H(false);
     set_N(false);
     set_Z(result == 0);
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1530,7 +1562,7 @@ void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
     set_H(true);
     set_N(false);
     set_Z(isbiton(bbb, temp));
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1550,7 +1582,7 @@ void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
         *reg = temp;
     }
     //flags are not affected here
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1570,7 +1602,7 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
         *reg = temp;
     }
     //flags are not affected here
-    cycles_since_last_screen += delay;
+    cyclecount += delay;
     cycle_delay(delay);
 }
 
@@ -1584,30 +1616,6 @@ void gb::write_mem(uint16_t address, uint8_t value) {
     else
         sharedMemory.write_mem(address, value);
 }
-
-/*
-uint8_t gb::read_mem(uint16_t address) {
-    //todo: go back and replace all the '&memory[HL()]' calls
-    if (address == 0xFF00){
-        //joypad register
-        if(!isbiton(5, memory[0xFF00]))
-        {
-            //action buttons selected
-            return ((memory[0xFF00] & 0xF0) | (buttons & 0x0F));
-        }
-        else if(!isbiton(4, memory[0xFF00]))
-        {
-            //direction buttons selected
-            return ((memory[0xFF00] & 0xF0) | (directions & 0x0F));
-        }
-    }
-    else if (address < 0x100 && memory[0xFF50] == 0x00)
-    {
-        return bootrom[address];
-    }
-    else //todo: more banking shiz
-        return memory[address];
-}*/
 
 uint8_t *gb::decode_register(uint8_t xxx) {
     switch (xxx)

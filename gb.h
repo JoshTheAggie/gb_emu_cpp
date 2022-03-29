@@ -185,11 +185,11 @@ public:
     //void LoadROM(char const *filename);
     void CPU_execute_op();
     void update_joypad_reg();
-    uint32_t cycles_since_last_screen;
+    int32_t cyclecount;
 
     //hardware timers
     void update_timers(uint32_t cycles);
-    bool isclockenabled();
+    static bool isclockenabled();
     void handle_div_reg(uint32_t cycles);
     void set_clock_freq();
     const uint32_t CLOCKSPEED = 4194304;

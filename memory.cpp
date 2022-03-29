@@ -84,6 +84,12 @@ uint8_t memory::read_mem(uint16_t address) {
     {
         return bootrom[address];
     }
+    else if (address == 0xFF44)
+    {
+        //purely here for debug breakpoint
+        printf("scanline register: %d\n", system_mem[address]);
+        return system_mem[address];
+    }
     else //todo: more banking shiz
         return system_mem[address];
 }
@@ -123,7 +129,13 @@ void memory::LoadROM(const char *filename) {
         //copy the first 0x8000 bytes into RAM
         for (int i = 0; i < size; i++)
         {
-            system_mem[i] = cartridge_rom[i];
+            if(i >= size) system_mem[i] = 0x00;
+            else
+                system_mem[i] = cartridge_rom[i];
         }
     }
+}
+
+void memory::incrementLY() {
+    system_mem[0xFF44]++;
 }

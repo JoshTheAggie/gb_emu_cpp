@@ -27,27 +27,20 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
     bool quit = false;
 
     const int MAXCYCLES = 69905;
-    uint32_t oldCycles = 0, deltaCycles = 0;
+    int32_t cycles_since_last_screen = 0;
 
     while(!quit)
     {
-        //quit = platform.ProcessInput(cpu.directions, cpu.buttons);
-        //auto currentTime = std::chrono::high_resolution_clock::now();
-        //float dt = std::chrono::duration<float, std::chrono::nanoseconds::period>(currentTime-lastCycleTime).count();
-        //if (dt > cycleDelay){
-            //lastCycleTime = currentTime;
-        while ((cpu.cycles_since_last_screen < MAXCYCLES) && !quit) {
+        while ((cycles_since_last_screen < MAXCYCLES) && !quit) {
             quit = platform.ProcessInput(sharedMemory.directions, sharedMemory.buttons);
             cpu.update_joypad_reg();
             cpu.CPU_execute_op();
-            deltaCycles = cpu.cycles_since_last_screen - oldCycles;
-            cpu.update_timers(deltaCycles);
-            cpu.gpu->update_graphics(deltaCycles);
-            oldCycles = cpu.cycles_since_last_screen;
+            cycles_since_last_screen += cpu.cyclecount;
+            cpu.update_timers(cpu.cyclecount);
+            cpu.gpu->update_graphics(cpu.cyclecount);
         }
-        cpu.cycles_since_last_screen = 0;
+        cycles_since_last_screen = 0;
         platform.Update(cpu.video);
-
     }
     return 0;
 }

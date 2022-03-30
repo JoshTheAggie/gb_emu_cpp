@@ -127,7 +127,6 @@ void gb::request_interrupt(uint8_t irq_num) {
 }
 
 void gb::CPU_execute_op() {
-
     //TODO: ensure interrupt handler works
     if(!any_interrupts()) {
         //fetch instruction
@@ -139,7 +138,7 @@ void gb::CPU_execute_op() {
         //increment pc before doing anything
         PC++;
 #ifdef DEBUG
-        while (opscompleted > INSTRUCTIONS_TIL_HALT);
+        while (opscompleted >= INSTRUCTIONS_TIL_HALT);
 #endif
         if (CB_instruction) {
             cyclecount += 1;
@@ -1909,7 +1908,7 @@ void gb::cycle_delay(uint8_t cycles) {
     cycles_ran += cycles;
     if (cycles_ran >= 4194) //approximately the number of cycles in 1 ms (4194.304)
     {
-        clock.restart();
+        //clock.restart();
         cycles_ran = 0;
         //while(clock.getElapsedTime().asMilliseconds() < 1); //yep, just NOP
     }
@@ -1995,7 +1994,7 @@ void gb::write_AF(uint16_t value) {
 }
 
 void gb::update_timers(uint32_t cycles) {
-    //handle_div_reg(uint32_t cycles);
+    handle_div_reg(cycles);
     if(isclockenabled()){
         timer_counter -= cycles;
 
@@ -2043,14 +2042,3 @@ void gb::set_clock_freq() {
         case 3: timer_counter = 256;
     }
 }
-
-/*
-void gb::performDMAtransfer(uint8_t data) {
-    //copies 0xA0 bytes into sprite RAM.
-    //source address is the data originally attempted to write to 0xFF46 * 0x100
-    uint16_t address = data << 8;
-    for (int i = 0; i < 0xA0; i++)
-    {
-        write_mem(0xFE00+i, read_mem(address+i));
-    }
-}*/

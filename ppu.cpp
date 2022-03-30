@@ -273,7 +273,7 @@ void ppu::render_sprites() {
     for (int sprite = 0; sprite < 40; sprite++)
     {
         //each sprite's OAM entry is 4 bytes
-        uint8_t index = sprite << 2; //sprite * 4
+        uint8_t index = sprite * 4; //sprite * 4
         uint8_t ypos = sharedMemory.read_mem(0xFE00 + index) - 16;
         int ysize = (use8x16) ? 16 : 8;
 
@@ -284,8 +284,8 @@ void ppu::render_sprites() {
             uint8_t xpos = sharedMemory.read_mem(0xFE00 + index + 1) - 8;
             uint8_t tile_location = sharedMemory.read_mem(0xFE00 + index + 2);
             uint8_t attributes = sharedMemory.read_mem(0xFE00 + index + 3);
-            bool xflip = testbit(6, attributes);
-            bool yflip = testbit(5, attributes);
+            bool yflip = testbit(6, attributes);
+            bool xflip = testbit(5, attributes);
 
             int line = scanline - ypos;
 
@@ -295,9 +295,9 @@ void ppu::render_sprites() {
                 line = -1 * (line - ysize);
             }
 
-            line <<= 1; //double line num same as background tiles
+            line = line * 2; //double line num same as background tiles
             //each line of the tile is 2 bytes
-            uint16_t data_address = 0x8000 + (tile_location << 4) + line;
+            uint16_t data_address = 0x8000 + (tile_location * 16) + line;
             uint8_t data1 = sharedMemory.read_mem(data_address);
             uint8_t data2 = sharedMemory.read_mem(data_address + 1);
 
@@ -324,15 +324,22 @@ void ppu::render_sprites() {
 
                 switch(col)
                 {
-                    case WHITE: red = 0xFF; green = 0xFF; blue = 0xFF; break;
-                    case LIGHT_GRAY: red = 0xA9; green = 0xA9; blue = 0xA9; break;
-                    case DARK_GRAY: red = 0x84; green = 0x84; blue = 0x84; break;
-                    default: break;
+                    case WHITE:
+                        red = 0xFF; green = 0xFF; blue = 0xFF;
+                        break;
+                    case LIGHT_GRAY:
+                        red = 0xA9; green = 0xA9; blue = 0xA9;
+                        break;
+                    case DARK_GRAY:
+                        red = 0x84; green = 0x84; blue = 0x84;
+                        break;
+                    default:
+                        break;
                 }
 
                 int xpix = 7 - tilePixel;
 
-                int pixel = xpos - xpix;
+                int pixel = xpos + xpix;
 
                 //sanity check
                 if ((scanline<0)||(scanline>143)||(pixel<0)||(pixel>159)) continue;

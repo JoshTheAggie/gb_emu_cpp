@@ -16,7 +16,7 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
     int cycleDelay = std::stoi(argv[2]);
     char const *romFileName = argv[3];
 
-    Platform platform("Joshua Mashburn's GB Emu", VIDEO_WIDTH * videoScale, VIDEO_HEIGHT * videoScale, VIDEO_WIDTH, VIDEO_HEIGHT, videoScale);
+    Platform platform("GB Emu", VIDEO_WIDTH * videoScale, VIDEO_HEIGHT * videoScale, VIDEO_WIDTH, VIDEO_HEIGHT, videoScale);
 
     gb cpu{};
     sharedMemory.LoadROM(romFileName);

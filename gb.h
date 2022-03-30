@@ -7,10 +7,10 @@
 
 #include <cstdint>
 #include <fstream>
-#include <string>
+#include <iostream>
+#include <chrono>
 #include "ppu.h"
 #include "memory.h"
-#include <SFML/System/Clock.hpp>
 
 #ifndef GBEMUJM_GB_H
 #define GBEMUJM_GB_H
@@ -21,10 +21,12 @@ const unsigned int VIDEO_HEIGHT = 144;
 extern memory sharedMemory;
 
 class gb {
+    //performance profiling
+    //std::time_t start, end;
     //debug
     int opscompleted = 0;
 
-    sf::Clock clock;
+    //sf::Clock clock;
     //used for CPU speed regulation
     uint32_t cycles_ran = 0;
     uint8_t opcode;          //8-bit instructions

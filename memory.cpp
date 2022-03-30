@@ -26,10 +26,10 @@ memory::memory() {
         //free the buffer
         delete[] buffer;
     }
-    else
+    /*else
     {
         std::cerr << "Cannot load boot rom!\n";
-    }
+    }*/
 }
 
 void memory::write_mem(uint16_t address, uint8_t value) {
@@ -38,7 +38,7 @@ void memory::write_mem(uint16_t address, uint8_t value) {
     //don't allow writes to read-only memory
     if (address < 0x8000)
     {
-        printf("Attempted write to ROM, address %x\n", address);
+        //printf("Attempted write to ROM, address %x\n", address);
     }
         // writes to ECHO RAM writes to RAM as well
     else if ((address >= 0xE000) && (address < 0xFE00))
@@ -49,7 +49,7 @@ void memory::write_mem(uint16_t address, uint8_t value) {
         //this area is restricted
     else if (( address >= 0xFEA0 ) && (address < 0xFEFF))
     {
-        printf("Attempted write to restricted memory, address %x\n", address);
+        //printf("Attempted write to restricted memory, address %x\n", address);
     }
     else if (address == 0xFF04){
         //attempted write to timer div register, resets it
@@ -67,7 +67,7 @@ void memory::write_mem(uint16_t address, uint8_t value) {
     }
     else if(address >= 0x8000 && address < 0xA000)
     {
-        printf("Write to VRAM. Address: %X\tData: %X\n", address, value);
+        //printf("Write to VRAM. Address: %X\tData: %X\n", address, value);
         system_mem[address] = value;
     }
     else
@@ -94,7 +94,7 @@ uint8_t memory::read_mem(uint16_t address) {
         return bootrom[address];
     }
     else if (address >= 0x104 && address < 0x133) {
-        printf("Logo. Address: %X\t Data: %X\n", address, system_mem[address]);
+        //printf("Logo. Address: %X\t Data: %X\n", address, system_mem[address]);
         return system_mem[address];
     }
     else //todo: more banking shiz
@@ -144,10 +144,10 @@ void memory::LoadROM(const char *filename) {
                 system_mem[i] = cartridge_rom[i];
         }
     }
-    else
+    /*else
     {
         std::cerr << "Cannot open ROM file!\n";
-    }
+    }*/
 }
 
 void memory::incrementLY() {

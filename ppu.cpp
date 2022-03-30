@@ -267,11 +267,81 @@ void ppu::render_tiles() {
 
 void ppu::render_sprites() {
     bool use8x16 = obj_size();
+    int scanline = LY;
 
-    //loop through all 40 sprites
+    //loop through all 40 sprites in OAM
     for (int sprite = 0; sprite < 40; sprite++)
     {
-        //todo: do shit here
+        //each sprite's OAM entry is 4 bytes
+        uint8_t index = sprite << 2; //sprite * 4
+        uint8_t ypos = sharedMemory.read_mem(0xFE00 + index) - 16;
+        int ysize = (use8x16) ? 16 : 8;
+
+        //does the sprite appear in this scanline?
+        if((scanline >= ypos) && (scanline < (ypos + ysize)))
+        {
+            //moved all these here to avoid unneeded memory accesses
+            uint8_t xpos = sharedMemory.read_mem(0xFE00 + index + 1) - 8;
+            uint8_t tile_location = sharedMemory.read_mem(0xFE00 + index + 2);
+            uint8_t attributes = sharedMemory.read_mem(0xFE00 + index + 3);
+            bool xflip = testbit(6, attributes);
+            bool yflip = testbit(5, attributes);
+
+            int line = scanline - ypos;
+
+            //do we read the sprite in backwards on the Y axis?
+            if (yflip)
+            {
+                line = -1 * (line - ysize);
+            }
+
+            line <<= 1; //double line num same as background tiles
+            //each line of the tile is 2 bytes
+            uint16_t data_address = 0x8000 + (tile_location << 4) + line;
+            uint8_t data1 = sharedMemory.read_mem(data_address);
+            uint8_t data2 = sharedMemory.read_mem(data_address + 1);
+
+            //render the line of the sprite
+            for (int tilePixel = 7; tilePixel >= 0; tilePixel--)
+            {
+                int colorbit = tilePixel;
+                if(xflip)
+                {
+                    colorbit = -1 * (colorbit - 7);
+                }
+
+                //the rest is the same as for tiles
+
+                int colornum = getbitvalue(colorbit, data2) << 1;
+                colornum |= getbitvalue(colorbit, data1);
+                //which palette?
+                uint16_t coloraddress = testbit(4, attributes)? 0xFF49 : 0xFF48;
+                COLOR col = get_color(colornum, coloraddress);
+                //white is transparent for tiles
+                if(col == WHITE) continue;
+
+                int red = 0, green = 0, blue = 0;
+
+                switch(col)
+                {
+                    case WHITE: red = 0xFF; green = 0xFF; blue = 0xFF; break;
+                    case LIGHT_GRAY: red = 0xA9; green = 0xA9; blue = 0xA9; break;
+                    case DARK_GRAY: red = 0x84; green = 0x84; blue = 0x84; break;
+                    default: break;
+                }
+
+                int xpix = 7 - tilePixel;
+
+                int pixel = xpos - xpix;
+
+                //sanity check
+                if ((scanline<0)||(scanline>143)||(pixel<0)||(pixel>159)) continue;
+
+                //render the pixel to display
+                uint32_t pixeldata = (red << 24) + (green << 16) + (blue << 8) + 0xFF; //RGBA for SFML
+                display[scanline * 160 + pixel] = pixeldata;
+            }
+        }
     }
 }
 

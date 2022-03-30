@@ -62,7 +62,7 @@ gb::gb()
     sharedMemory.write_mem(0xFF24, 0x77);
     sharedMemory.write_mem(0xFF25, 0xF3);
     sharedMemory.write_mem(0xFF26, 0xF1);
-    sharedMemory.write_mem(0xFF40, 0x91);
+    sharedMemory.write_mem(0xFF40, 0x93);
     sharedMemory.write_mem(0xFF41, 0x85);
     sharedMemory.write_mem(0xFF42, 0x00);
     sharedMemory.write_mem(0xFF43, 0x00);
@@ -70,8 +70,8 @@ gb::gb()
     sharedMemory.write_mem(0xFF45, 0x00);
     sharedMemory.write_mem(0xFF46, 0xFF);
     sharedMemory.write_mem(0xFF47, 0xFC);
-    sharedMemory.write_mem(0xFF48, 0x00); //may also be FF
-    sharedMemory.write_mem(0xFF49, 0x00); //may also be FF
+    sharedMemory.write_mem(0xFF48, 0xFF);
+    sharedMemory.write_mem(0xFF49, 0xFF);
     sharedMemory.write_mem(0xFF4A, 0x00);
     sharedMemory.write_mem(0xFF4B, 0x00);
     sharedMemory.write_mem(0xFF4D, 0xFF);
@@ -133,11 +133,14 @@ void gb::CPU_execute_op() {
         //fetch instruction
         opcode = sharedMemory.read_mem(PC);
         //output for debug
-        //std::printf("pc: %x\topcode: %x\n", PC, opcode);
-
+#ifdef DEBUG
+        std::printf("pc:  %x\topcode:  %x\t", PC, opcode);
+#endif
         //increment pc before doing anything
-        PC++; while (PC == 0xF1);
-
+        PC++;
+#ifdef DEBUG
+        while (opscompleted > INSTRUCTIONS_TIL_HALT);
+#endif
         if (CB_instruction) {
             cyclecount += 1;
             cycle_delay(1);
@@ -245,10 +248,10 @@ void gb::CPU_execute_op() {
                             OP_AND_r(get_bits_0_2(opcode));
                             break;
                         case 5:
-                            OP_OR_r(get_bits_0_2(opcode));
+                            OP_XOR_r(get_bits_0_2(opcode));
                             break;
                         case 6:
-                            OP_XOR_r(get_bits_0_2(opcode));
+                            OP_OR_r(get_bits_0_2(opcode));
                             break;
                         case 7:
                             OP_CP_r(get_bits_0_2(opcode));
@@ -257,6 +260,9 @@ void gb::CPU_execute_op() {
                     break;
                 case 3: //11
                     if (opcode == 0xCB) {
+#ifdef DEBUG
+                        std::printf("\n");
+#endif
                         cycle_delay(1);
                         CB_instruction = true;
                     } else
@@ -364,6 +370,9 @@ void gb::CPU_execute_op() {
             disable_interrupts = false;
         }
     }
+#ifdef DEBUG
+    opscompleted++;
+#endif
 }
 
 void gb::update_joypad_reg() {
@@ -406,12 +415,18 @@ void gb::set_C(bool condition) {
 }
 
 void gb::OP_HALT() {
+#ifdef DEBUG
+    printf("HALT\n");
+#endif
     //HALT: power down CPU until an interrupt
     while (sharedMemory.read_mem(0xFF0F) == 0) ;
 }
 
 void gb::OP_STOP() {
     //todo: handle LCD once implemented
+#ifdef DEBUG
+    printf("STOP\n");
+#endif
     //STOP: halt CPU and LCD until button press
     while (isbiton(4, sharedMemory.read_mem(0xFF0F))) ;
 }
@@ -446,6 +461,9 @@ void gb::OP_RST(uint8_t xxx) {
         default:
             break;
     }
+#ifdef DEBUG
+    printf("RST %X\n", reset);
+#endif
     PC = reset;
     cyclecount += 8;
     cycle_delay(8);
@@ -472,6 +490,9 @@ void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
         sharedMemory.write_mem(HL(), val);
         delay = 2;
     }
+#ifdef DEBUG
+    printf("LD reg reg\n");
+#endif
     cyclecount += delay;
     cycle_delay(delay);
 }
@@ -490,6 +511,9 @@ void gb::OP_LD_imm(uint8_t xxx) {
         sharedMemory.write_mem(HL(), imm);
         delay = 3;
     }
+#ifdef DEBUG
+    printf("LD imm\n");
+#endif
     cyclecount += delay;
     cycle_delay(delay);
 }
@@ -502,26 +526,37 @@ void gb::OP_LD_mem(uint8_t xxx) {
     if(xxx % 2 == 1)
     {
         //load from mem to A
-        destination = &A;
         switch (xxx) {
             case 1:
                 val = sharedMemory.read_mem(BC());
+#ifdef DEBUG
+                printf("LD A, (BC)\n");
+#endif
                 break;
             case 3:
                 val = sharedMemory.read_mem(DE());
+#ifdef DEBUG
+                printf("LD A, (DE)\n");
+#endif
                 break;
             case 5:
                 val = sharedMemory.read_mem(HL());
+#ifdef DEBUG
+                printf("LD A, (HL+)\n");
+#endif
                 increment = true;
                 break;
             case 7:
                 val = sharedMemory.read_mem(HL());
+#ifdef DEBUG
+                printf("LD A, (HL-)\n");
+#endif
                 decrement = true;
                 break;
             default:
                 source = nullptr;
         }
-        *destination = val;
+        A = val;
     }
     else
     {
@@ -529,20 +564,32 @@ void gb::OP_LD_mem(uint8_t xxx) {
         switch (xxx) {
             case 0:
                 sharedMemory.write_mem(BC(), A);
+#ifdef DEBUG
+                printf("LD (BC), A\n");
+#endif
                 break;
             case 2:
                 sharedMemory.write_mem(DE(), A);
+#ifdef DEBUG
+                printf("LD (DE), A\n");
+#endif
                 break;
             case 4:
                 sharedMemory.write_mem(HL(), A);
+#ifdef DEBUG
+                printf("LD (HL+), A\n");
+#endif
                 increment = true;
                 break;
             case 6:
                 sharedMemory.write_mem(HL(), A);
+#ifdef DEBUG
+                printf("LD (HL-), A\n");
+#endif
                 decrement = true;
                 break;
             default:
-                destination = nullptr;
+                break;
         }
     }
     if (increment) inc_HL();
@@ -554,21 +601,34 @@ void gb::OP_LD_mem(uint8_t xxx) {
 void gb::OP_LDH(uint8_t yyy) {
     uint8_t delay = 2;
     uint16_t address = 0xFF00;
-    if (yyy == 2)
+    if (yyy == 2) {
+#ifdef DEBUG
+        printf("LDH (C) ");
+#endif
         address += C;
+    }
     else
     {
+#ifdef DEBUG
+        printf("LDH (a8) ");
+#endif
         address += sharedMemory.read_mem(PC++);
         delay++;
     }
     if (isbiton(4, opcode))
     {
         //destination is A
+#ifdef DEBUG
+        printf("to A\n");
+#endif
         A = sharedMemory.read_mem(address);
     }
     else
     {
         //destination is mem
+#ifdef DEBUG
+        printf("from A\n");
+#endif
         write_mem(address, A);
     }
     cyclecount += delay;
@@ -583,15 +643,27 @@ void gb::OP_LD_imm16(uint8_t xx) {
     {
         case 0:
             write_BC(imm);
+#ifdef DEBUG
+            printf("LD BD, d16\n");
+#endif
             break;
         case 1:
             write_DE(imm);
+#ifdef DEBUG
+            printf("LD DE, d16\n");
+#endif
             break;
         case 2:
             write_HL(imm);
+#ifdef DEBUG
+            printf("LD HL, d16\n");
+#endif
             break;
         case 3:
             SP = imm;
+#ifdef DEBUG
+            printf("LD SP, d16\n");
+#endif
             break;
         default:
             break;
@@ -605,6 +677,9 @@ void gb::OP_STORE_SP() {
     address += (sharedMemory.read_mem(PC++) << 8);
     write_mem(address, (SP & 0xFF));
     write_mem(address+1, (SP >> 8));
+#ifdef DEBUG
+    printf("LD (a16) SP)\n");
+#endif
     cyclecount += 5;
     cycle_delay(5);
 }
@@ -628,6 +703,9 @@ void gb::OP_INC_r(uint8_t xxx) {
         (*reg)++;
         set_Z(*reg == 0);
     }
+#ifdef DEBUG
+    printf("INC r\n");
+#endif
     set_N(false);
     set_H(((temp & 0xF) + 1) > 0xF);
     cyclecount += delay;
@@ -653,6 +731,9 @@ void gb::OP_DEC_r(uint8_t xxx) {
         (*reg)--;
         set_Z(*reg == 0);
     }
+#ifdef DEBUG
+    printf("DEC r\n");
+#endif
     set_N(true);
     set_H(((temp & 0xF)) == 0x00);
     cyclecount += delay;
@@ -686,6 +767,9 @@ void gb::OP_ADD16(uint8_t xx) {
         default:
             break;
     }
+#ifdef DEBUG
+    printf("ADD HL, rr\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -708,6 +792,9 @@ void gb::OP_INC16(uint8_t xx) {
         default:
             break;
     }
+#ifdef DEBUG
+    printf("INC rr\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -730,6 +817,9 @@ void gb::OP_DEC16(uint8_t xx) {
         default:
             break;
     }
+#ifdef DEBUG
+    printf("DEC rr\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -743,6 +833,9 @@ void gb::OP_DAA() {
     set_Z(A == 0);
     set_H(false);
     set_C(tens > 9);
+#ifdef DEBUG
+    printf("DAA\n");
+#endif
     cyclecount += 1;
     cycle_delay(1);
 }
@@ -751,6 +844,9 @@ void gb::OP_CPL() {
     A = ~A;
     cycle_delay(1);
     cyclecount += 1;
+#ifdef DEBUG
+    printf("CPL\n");
+#endif
     set_N(true);
     set_H(true);
 }
@@ -763,6 +859,9 @@ void gb::OP_CCF() {
         set_C(true);
     set_H(false);
     set_N(false);
+#ifdef DEBUG
+    printf("CCF\n");
+#endif
     cyclecount += 1;
     cycle_delay(1);
 }
@@ -772,6 +871,9 @@ void gb::OP_SCF() {
     set_C(true);
     set_H(false);
     set_N(false);
+#ifdef DEBUG
+    printf("SCF r\n");
+#endif
     cyclecount += 1;
     cycle_delay(1);
 }
@@ -782,22 +884,34 @@ void gb::OP_rot_shift_A(uint8_t xxx) {
     switch (xxx) {
         case 0:
             //RLCA
+#ifdef DEBUG
+            printf("RLCA\n");
+#endif
             newA = A << 1;
             set_C((newA >> 8) == 1);
             break;
         case 1:
             //RRCA
+#ifdef DEBUG
+            printf("RRCA\n");
+#endif
             newA = A >> 1;
             set_C(isbiton(0, A));
             break;
         case 2:
             //RLA
+#ifdef DEBUG
+            printf("RLA\n");
+#endif
             newA = A << 1;
             newA += get_C();
             set_C((newA >> 8) == 1);
             break;
         case 3:
             //RRA
+#ifdef DEBUG
+            printf("RRA\n");
+#endif
             newA = A >> 1;
             newA += (get_C() << 7);
             set_C(isbiton(0, A));
@@ -817,8 +931,16 @@ void gb::OP_ADD_r(uint8_t xxx) {
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
+#ifdef DEBUG
+        printf("ADD (HL)\n");
+#endif
     }
-    else val = *reg;
+    else {
+#ifdef DEBUG
+        printf("ADD r\n");
+#endif
+        val = *reg;
+    }
     set_N(false);
     set_H((A & 0xF + val & 0xF) > 0xF);
     set_C(((uint16_t)A + (uint16_t)(val)) > 0xFF);
@@ -833,10 +955,18 @@ void gb::OP_ADC_r(uint8_t xxx) {
     uint8_t * reg = decode_register(xxx);
     uint8_t val;
     if (xxx == 0x6) {
+#ifdef DEBUG
+        printf("ADC (HL)\n");
+#endif
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
-    else val = *reg;
+    else {
+#ifdef DEBUG
+        printf("ADC r\n");
+#endif
+        val = *reg;
+    }
     set_N(false);
     set_H((A & 0xF + val & 0xF + get_C()) > 0xF);
     set_C(((uint16_t)A + (uint16_t)val + get_C()) > 0xFF);
@@ -853,8 +983,16 @@ void gb::OP_SUB_r(uint8_t xxx) {
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
+#ifdef DEBUG
+        printf("SUB (HL)\n");
+#endif
     }
-    else val = *reg;
+    else {
+#ifdef DEBUG
+        printf("SUB r\n");
+#endif
+        val = *reg;
+    }
     set_N(true);
     set_H((A & 0xF) < (val & 0xF));
     set_C(A < val);
@@ -871,8 +1009,16 @@ void gb::OP_SBC_r(uint8_t xxx) {
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
+#ifdef DEBUG
+        printf("SBC (HL)\n");
+#endif
     }
-    else val = *reg;
+    else {
+#ifdef DEBUG
+        printf("SBC r\n");
+#endif
+        val = *reg;
+    }
     set_N(true);
     set_H((A & 0xF) < (val & 0xF + get_C()));
     set_C(A < (val + get_C()));
@@ -887,10 +1033,18 @@ void gb::OP_AND_r(uint8_t xxx) {
     uint8_t * reg = decode_register(xxx);
     uint8_t val;
     if (xxx == 0x6) {
+#ifdef DEBUG
+        printf("AND (HL)\n");
+#endif
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
-    else val = *reg;
+    else{
+#ifdef DEBUG
+        printf("AND r\n");
+#endif
+        val = *reg;
+}
     A &= val;
     set_Z(A==0x00);
     set_N(false);
@@ -905,10 +1059,18 @@ void gb::OP_OR_r(uint8_t xxx) {
     uint8_t * reg = decode_register(xxx);
     uint8_t val;
     if (xxx == 0x6) {
+#ifdef DEBUG
+        printf("OR (HL)\n");
+#endif
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
-    else val = *reg;
+    else{
+#ifdef DEBUG
+        printf("OR r\n");
+#endif
+        val = *reg;
+    }
     A |= val;
     set_Z(A==0x00);
     set_N(false);
@@ -923,10 +1085,18 @@ void gb::OP_XOR_r(uint8_t xxx) {
     uint8_t * reg = decode_register(xxx);
     uint8_t val;
     if (xxx == 0x6) {
+#ifdef DEBUG
+        printf("XOR (HL)\n");
+#endif
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
-    else val = *reg;
+    else{
+#ifdef DEBUG
+        printf("XOR r\n");
+#endif
+        val = *reg;
+    }
     A ^= val;
     set_Z(A==0x00);
     set_N(false);
@@ -941,10 +1111,18 @@ void gb::OP_CP_r(uint8_t xxx) {
     uint8_t * reg = decode_register(xxx);
     uint8_t val;
     if (xxx == 0x6) {
+#ifdef DEBUG
+        printf("CP (HL)\n");
+#endif
         delay = 2;
         val = sharedMemory.read_mem(HL());
     }
-    else val = *reg;
+    else{
+#ifdef DEBUG
+        printf("CP r\n");
+#endif
+        val = *reg;
+    }
     uint8_t compare_val;
     compare_val = A - val;
     set_Z(compare_val==0x00);
@@ -960,11 +1138,17 @@ void gb::OP_LD_mem16() {
     address = sharedMemory.read_mem(PC++);
     address += (sharedMemory.read_mem(PC++) << 8);
     if (isbiton(4, opcode)){
+#ifdef DEBUG
+        printf("LD A (a16)\n");
+#endif
         //destination is A
         A = sharedMemory.read_mem(address);
     }
     else
     {
+#ifdef DEBUG
+        printf("LD (a16) A\n");
+#endif
         //destination is mem
         write_mem(address, A);
     }
@@ -974,6 +1158,9 @@ void gb::OP_LD_mem16() {
 
 void gb::OP_LD_SP_HL() {
     SP = HL();
+#ifdef DEBUG
+    printf("LD SP HL\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -983,15 +1170,27 @@ void gb::OP_PUSH_r(uint8_t xx) {
     switch (xx) {
         case 0:
             value = BC();
+#ifdef DEBUG
+            printf("PUSH BC\n");
+#endif
             break;
         case 1:
             value = DE();
+#ifdef DEBUG
+            printf("PUSH DE\n");
+#endif
             break;
         case 2:
             value = HL();
+#ifdef DEBUG
+            printf("PUSH HL\n");
+#endif
             break;
         case 3:
             value = AF();
+#ifdef DEBUG
+            printf("PUSH AF\n");
+#endif
             break;
         default:
             break;
@@ -1011,15 +1210,27 @@ void gb::OP_POP_r(uint8_t xx) {
     switch (xx) {
         case 0:
             write_BC(data);
+#ifdef DEBUG
+            printf("POP BC\n");
+#endif
             break;
         case 1:
             write_DE(data);
+#ifdef DEBUG
+            printf("POP DE\n");
+#endif
             break;
         case 2:
             write_HL(data);
+#ifdef DEBUG
+            printf("POP HL\n");
+#endif
             break;
         case 3:
             write_AF(data);
+#ifdef DEBUG
+            printf("POP AF\n");
+#endif
             break;
         default:
             break;
@@ -1034,6 +1245,9 @@ void gb::OP_LD_HL_SP_offset() {
     if (isbiton(7, offset))
         offset += 0xFF00;
     write_HL(SP + offset);
+#ifdef DEBUG
+    printf("LD HL SP+s8\n");
+#endif
     set_Z(false);
     set_N(false);
     set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
@@ -1047,6 +1261,9 @@ void gb::OP_ADD_SP() {
     offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset))
         offset += 0xFF00;
+#ifdef DEBUG
+    printf("ADD SP s8\n");
+#endif
     set_Z(false);
     set_N(false);
     set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
@@ -1059,12 +1276,18 @@ void gb::OP_ADD_SP() {
 void gb::OP_DI() {
     disable_interrupts = true;
     cyclecount += 1;
+#ifdef DEBUG
+    printf("DI\n");
+#endif
     cycle_delay(1);
 }
 
 void gb::OP_EI() {
     enable_interrupts = true;
     cyclecount += 1;
+#ifdef DEBUG
+    printf("EI\n");
+#endif
     cycle_delay(1);
 }
 
@@ -1074,6 +1297,9 @@ void gb::OP_ADD_A_imm() {
     set_H((A & 0xF + temp & 0xF) > 0xF);
     set_C(((uint16_t)A + (uint16_t)(temp)) > 0xFF);
     A += temp;
+#ifdef DEBUG
+    printf("ADD A, 0x%X\n", temp);
+#endif
     set_Z(A == 0x00);
     cyclecount += 2;
     cycle_delay(2);
@@ -1085,6 +1311,9 @@ void gb::OP_ADC_A_imm() {
     set_H((A & 0xF + temp & 0xF + get_C()) > 0xF);
     set_C(((uint16_t)A + (uint16_t)(temp) + get_C()) > 0xFF);
     A += temp + get_C();
+#ifdef DEBUG
+    printf("ADC A, 0x%X\n", temp);
+#endif
     set_Z(A == 0x00);
     cyclecount += 2;
     cycle_delay(2);
@@ -1096,6 +1325,9 @@ void gb::OP_SUB_A_imm() {
     set_H((A & 0xF) < (temp & 0xF));
     set_C((A < temp));
     A -= temp;
+#ifdef DEBUG
+    printf("SUB A, 0x%X\n", temp);
+#endif
     set_Z(A == 0x00);
     cyclecount += 2;
     cycle_delay(2);
@@ -1107,6 +1339,9 @@ void gb::OP_SBC_A_imm() {
     set_H((A & 0xF) < (temp & 0xF + get_C()));
     set_C((A < (temp + get_C())));
     A -= (temp + get_C());
+#ifdef DEBUG
+    printf("SBC A, 0x%X\n", temp);
+#endif
     set_Z(A == 0x00);
     cyclecount += 2;
     cycle_delay(2);
@@ -1118,6 +1353,9 @@ void gb::OP_AND_A_imm() {
     set_N(false);
     set_H(true);
     set_C(false);
+#ifdef DEBUG
+    printf("AND A, imm\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -1128,6 +1366,9 @@ void gb::OP_OR_A_imm() {
     set_N(false);
     set_H(false);
     set_C(false);
+#ifdef DEBUG
+    printf("OR A, imm\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -1138,6 +1379,9 @@ void gb::OP_XOR_A_imm() {
     set_N(false);
     set_H(false);
     set_C(false);
+#ifdef DEBUG
+    printf("XOR A, imm\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -1148,6 +1392,9 @@ void gb::OP_CP_A_imm() {
     set_H((A & 0xF) < (temp & 0xF));
     set_C((A < temp));
     set_Z(A == temp);
+#ifdef DEBUG
+    printf("CP A, imm\n");
+#endif
     cyclecount += 2;
     cycle_delay(2);
 }
@@ -1157,12 +1404,18 @@ void gb::OP_JP() {
     address = sharedMemory.read_mem(PC++);
     address += (sharedMemory.read_mem(PC++) << 8);
     PC = address;
+#ifdef DEBUG
+    printf("JP 0x%X\n", address);
+#endif
     cyclecount += 4;
     cycle_delay(4);
 }
 
 void gb::OP_JP_HL() {
     PC = HL();
+#ifdef DEBUG
+    printf("JP (HL)\n");
+#endif
     cyclecount += 1;
     cycle_delay(1);
 }
@@ -1178,6 +1431,9 @@ void gb::OP_JP_test(uint8_t xx) {
         PC = address;
         delay++;
     }
+#ifdef DEBUG
+    printf("JP cc 0x%X\n", address);
+#endif
     cyclecount += delay;
     cycle_delay(delay);
 }
@@ -1186,6 +1442,9 @@ void gb::OP_JR() {
     uint16_t offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
     PC = PC + offset;
+#ifdef DEBUG
+    printf("JR 0x%X\n", PC);
+#endif
     cyclecount += 3;
     cycle_delay(3);
 }
@@ -1200,6 +1459,9 @@ void gb::OP_JR_test(uint8_t cc) {
         PC = PC + offset;
         delay++;
     }
+#ifdef DEBUG
+    printf("JR cc 0x%X\n", PC + offset);
+#endif
     cyclecount += delay;
     cycle_delay(delay);
 }
@@ -1213,6 +1475,9 @@ void gb::OP_CALL() {
     write_mem(SP--, (PC >> 8));
     write_mem(SP, (PC & 0xFF));
     PC = address;
+#ifdef DEBUG
+    printf("CALL 0x%X\n", address);
+#endif
     cyclecount += 6;
     cycle_delay(6);
 }
@@ -1229,6 +1494,9 @@ void gb::OP_CALL_test(uint8_t xx) {
         PC = address;
         delay += 3;
     }
+#ifdef DEBUG
+    printf("CALL cc 0x%X\n", address);
+#endif
     cyclecount += delay;
     cycle_delay(delay);
 }
@@ -1238,6 +1506,9 @@ void gb::OP_RET() {
     newPC += (sharedMemory.read_mem(SP++) << 8);
     //printf("RET %X\n", newPC);
     PC = newPC;
+#ifdef DEBUG
+    printf("RET to 0x%X\n", newPC);
+#endif
     cyclecount += 4;
     cycle_delay(4);
 }
@@ -1250,7 +1521,13 @@ void gb::OP_RET_test(uint8_t xx) {
         uint16_t newPC = sharedMemory.read_mem(SP++);
         newPC += (sharedMemory.read_mem(SP++) << 8);
         PC = newPC;
+#ifdef DEBUG
+        printf("RET cc to 0x%X\n", newPC);
+#endif
     }
+#ifdef DEBUG
+    else printf("RET cc not taken\n");
+#endif
     cyclecount += delay;
     cycle_delay(delay);
 }
@@ -1260,11 +1537,17 @@ void gb::OP_RETI() {
     newPC += (sharedMemory.read_mem(SP++) << 8);
     PC = newPC;
     IME = true;
+#ifdef DEBUG
+    printf("RETI to 0x%X\n", newPC);
+#endif
     cyclecount += 4;
     cycle_delay(4);
 }
 
 void gb::CB_RLC(uint8_t xxx) {
+#ifdef DEBUG
+    printf("RLC r\n");
+#endif
     uint8_t delay = 2;
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
@@ -1296,29 +1579,27 @@ void gb::CB_RLC(uint8_t xxx) {
 }
 
 void gb::CB_RL(uint8_t xxx) {
+#ifdef DEBUG
+    printf("RL r\n");
+#endif
     uint8_t delay = 2;
-    uint8_t temp, tempHi, result;
+    uint8_t result;
+    uint16_t temp;
     uint8_t * reg = decode_register(xxx);
     if (xxx == 0x06) {
         temp = sharedMemory.read_mem(HL());
-
-        tempHi = temp << 1;
-        temp = temp >> 7;
-        result = temp + get_C();
-
+        temp = temp << 1;
+        result = temp | get_C();
         write_mem(HL(), result);
         delay = 4;
     }
     else {
         temp = *reg;
-
-        tempHi = temp << 1;
-        temp = temp >> 7;
-        result = temp + get_C();
-
+        temp = temp << 1;
+        result = temp | get_C();
         *reg = result;
     }
-    set_C(temp == 1);
+    set_C(temp >> 8 != 0);
     set_H(false);
     set_N(false);
     set_Z(result == 0);
@@ -1327,6 +1608,9 @@ void gb::CB_RL(uint8_t xxx) {
 }
 
 void gb::CB_RRC(uint8_t xxx) {
+#ifdef DEBUG
+    printf("RRC r\n");
+#endif
     uint8_t delay = 2;
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
@@ -1358,6 +1642,9 @@ void gb::CB_RRC(uint8_t xxx) {
 }
 
 void gb::CB_RR(uint8_t xxx) {
+#ifdef DEBUG
+    printf("RR r\n");
+#endif
     uint8_t delay = 2;
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
@@ -1389,6 +1676,9 @@ void gb::CB_RR(uint8_t xxx) {
 }
 
 void gb::CB_SLA(uint8_t xxx) {
+#ifdef DEBUG
+    printf("SLA r\n");
+#endif
     uint8_t delay = 2;
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
@@ -1416,6 +1706,9 @@ void gb::CB_SLA(uint8_t xxx) {
 }
 
 void gb::CB_SRA(uint8_t xxx) {
+#ifdef DEBUG
+    printf("SRA r\n");
+#endif
     uint8_t delay = 2;
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
@@ -1447,6 +1740,9 @@ void gb::CB_SRA(uint8_t xxx) {
 }
 
 void gb::CB_SWAP(uint8_t xxx) {
+#ifdef DEBUG
+    printf("SWAP r\n");
+#endif
     uint8_t delay = 2;
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
@@ -1474,6 +1770,9 @@ void gb::CB_SWAP(uint8_t xxx) {
 }
 
 void gb::CB_SRL(uint8_t xxx) {
+#ifdef DEBUG
+    printf("SRL r\n");
+#endif
     uint8_t delay = 2;
     uint8_t temp, tempHi, result;
     uint8_t * reg = decode_register(xxx);
@@ -1501,6 +1800,9 @@ void gb::CB_SRL(uint8_t xxx) {
 }
 
 void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
+#ifdef DEBUG
+    printf("BIT %d r\n", bbb);
+#endif
     uint8_t delay = 2;
     uint8_t temp;
     uint8_t * reg = decode_register(xxx);
@@ -1519,6 +1821,9 @@ void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
 }
 
 void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
+#ifdef DEBUG
+    printf("SET %d r\n", bbb);
+#endif
     uint8_t delay = 2;
     uint8_t temp;
     uint8_t * reg = decode_register(xxx);
@@ -1539,6 +1844,9 @@ void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
 }
 
 void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
+#ifdef DEBUG
+    printf("RES %d r\n", bbb);
+#endif
     uint8_t delay = 2;
     uint8_t temp;
     uint8_t * reg = decode_register(xxx);
@@ -1559,6 +1867,10 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
 }
 
 void gb::write_mem(uint16_t address, uint8_t value) {
+#ifdef DEBUG
+    if (address != 0xFF00)
+        printf("write_mem. A: 0x%X D: 0x%X\n",address, value);
+#endif
     if (address == 0xFF07)
     {
         //update timer controller!

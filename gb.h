@@ -2,6 +2,9 @@
 // Created by joshua on 5/23/20.
 //
 
+//#define DEBUG
+#define INSTRUCTIONS_TIL_HALT 1000
+
 #include <cstdint>
 #include <fstream>
 #include <string>
@@ -18,6 +21,9 @@ const unsigned int VIDEO_HEIGHT = 144;
 extern memory sharedMemory;
 
 class gb {
+    //debug
+    int opscompleted = 0;
+
     sf::Clock clock;
     //used for CPU speed regulation
     uint32_t cycles_ran = 0;

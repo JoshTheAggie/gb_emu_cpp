@@ -65,6 +65,11 @@ void memory::write_mem(uint16_t address, uint8_t value) {
         //DMA time
         performDMAtransfer(value);
     }
+    else if(address >= 0x8000 && address < 0xA000)
+    {
+        printf("Write to VRAM. Address: %X\tData: %X\n", address, value);
+        system_mem[address] = value;
+    }
     else
         system_mem[address] = value;
 }
@@ -87,6 +92,10 @@ uint8_t memory::read_mem(uint16_t address) {
     else if (address < 0x100 && system_mem[0xFF50] == 0x00)
     {
         return bootrom[address];
+    }
+    else if (address >= 0x104 && address < 0x133) {
+        printf("Logo. Address: %X\t Data: %X\n", address, system_mem[address]);
+        return system_mem[address];
     }
     else //todo: more banking shiz
         return system_mem[address];

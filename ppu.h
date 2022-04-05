@@ -1,7 +1,7 @@
 //
 // Created by joshua on 3/26/22.
 //
-#include <cstdint>
+
 #include "memory.h"
 
 #ifndef GBEMUJM_PPU_H
@@ -17,6 +17,10 @@
 #define OBP1 sharedMemory.read_mem(0xFF49)
 #define WY sharedMemory.read_mem(0xFF4A)
 #define WX sharedMemory.read_mem(0xFF4B)
+
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
 
 extern memory sharedMemory;
 

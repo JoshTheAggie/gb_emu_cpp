@@ -3,9 +3,7 @@
 //
 
 //#define DEBUG
-#define INSTRUCTIONS_TIL_HALT 1000
 
-#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <chrono>
@@ -14,6 +12,11 @@
 
 #ifndef GBEMUJM_GB_H
 #define GBEMUJM_GB_H
+
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+
 
 const unsigned int VIDEO_WIDTH = 160;
 const unsigned int VIDEO_HEIGHT = 144;

@@ -8,6 +8,10 @@
 #ifndef GBEMUJM_PLATFORM_H
 #define GBEMUJM_PLATFORM_H
 
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+
 class Platform {
     sf::RenderWindow* window{};
     sf::Texture* texture{};
@@ -38,7 +42,7 @@ public:
     void Update(void const* buffer)
     {
         texture->update((sf::Uint8*)buffer);
-        window->clear();
+        //window->clear();
         window->draw(*sprite);
         window->display();
     }

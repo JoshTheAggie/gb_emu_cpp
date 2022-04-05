@@ -4,6 +4,31 @@
 #include "memory.h"
 
 memory sharedMemory;
+Platform * platform;
+gb cpu{};
+
+int cpustep(){
+    cpu.CPU_execute_op();
+    cpu.update_timers(cpu.cyclecount);
+    cpu.gpu->update_graphics(cpu.cyclecount);
+    return cpu.cyclecount;
+}
+
+bool emulatorframe(){
+    bool quit = false;
+    const int MAXCYCLES = 69905;
+    int cycles_since_last_screen = 0;
+    while (cycles_since_last_screen < MAXCYCLES){
+        cycles_since_last_screen += cpustep();
+    }
+    cycles_since_last_screen = 0;
+    platform->Update(cpu.video);
+    quit = platform->ProcessInput(sharedMemory.directions, sharedMemory.buttons);
+    cpu.update_joypad_reg();
+    return quit;
+}
+
+
 
 int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM name
     if(argc != 4)
@@ -16,30 +41,18 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
     int cycleDelay = std::stoi(argv[2]);
     char const *romFileName = argv[3];
 
-    Platform platform("GB Emu", VIDEO_WIDTH * videoScale, VIDEO_HEIGHT * videoScale, VIDEO_WIDTH, VIDEO_HEIGHT, videoScale);
+    platform = new Platform("GB Emu", VIDEO_WIDTH * videoScale, VIDEO_HEIGHT * videoScale, VIDEO_WIDTH, VIDEO_HEIGHT, videoScale);
 
-    gb cpu{};
+    //gb cpu{};
     sharedMemory.LoadROM(romFileName);
     std::printf("Loaded ROM image ");
     std::printf(romFileName);
     std::printf("\n");
     bool quit = false;
 
-    const int MAXCYCLES = 69905;
-    int32_t cycles_since_last_screen = 0;
-
     while(!quit)
     {
-        while ((cycles_since_last_screen < MAXCYCLES) && !quit) {
-            quit = platform.ProcessInput(sharedMemory.directions, sharedMemory.buttons);
-            cpu.update_joypad_reg();
-            cpu.CPU_execute_op();
-            cycles_since_last_screen += cpu.cyclecount;
-            cpu.update_timers(cpu.cyclecount);
-            cpu.gpu->update_graphics(cpu.cyclecount);
-        }
-        cycles_since_last_screen = 0;
-        platform.Update(cpu.video);
+        quit = emulatorframe();
     }
     return 0;
 }

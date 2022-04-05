@@ -5,10 +5,11 @@
 #ifndef GBEMUJM_MEMORY_H
 #define GBEMUJM_MEMORY_H
 
-
-#include <cstdint>
-//#include <iostream>
 #include <fstream>
+
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
 
 class memory {
     uint8_t system_mem [0x10000]{};    //64KiB of memory

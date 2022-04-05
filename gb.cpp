@@ -137,9 +137,7 @@ void gb::CPU_execute_op() {
 #endif
         //increment pc before doing anything
         PC++;
-#ifdef DEBUG
-        while (opscompleted >= INSTRUCTIONS_TIL_HALT);
-#endif
+
         if (CB_instruction) {
             cyclecount += 1;
             cycle_delay(1);

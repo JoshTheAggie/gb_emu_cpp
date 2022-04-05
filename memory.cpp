@@ -83,8 +83,10 @@ uint8_t memory::read_mem(uint16_t address) {
             //action buttons selected
             return ((system_mem[0xFF00] & 0xF0) | (buttons & 0x0F));
         }
-        else if((system_mem[0xFF00] & 0x10) == 0)
+        else //if((system_mem[0xFF00] & 0x10) == 0)
         {
+            //todo: ensure the above commenting out works
+            //we operate under the assumption that exactly one or the other is 0
             //direction buttons selected
             return ((system_mem[0xFF00] & 0xF0) | (directions & 0x0F));
         }

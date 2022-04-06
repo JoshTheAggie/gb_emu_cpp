@@ -1,5 +1,6 @@
 #include <iostream>
 #include <chrono>
+#include <thread>
 #include "gb.h"
 #include "platform.h"
 #include "memory.h"
@@ -30,7 +31,8 @@ bool emulatorframe(){
     currenttime = std::chrono::steady_clock::now();
     //std::cout << "Elapsed time in microseconds: " <<
     //            std::chrono::duration_cast<std::chrono::microseconds>(currenttime - oldtime).count() << "us\n";
-    while (std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count() < 16700);
+    while (std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count() < 16200)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     std::cout << "FPS: " << 1000000/(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count()) << "\n";
     oldtime = std::chrono::steady_clock::now();
     return quit;

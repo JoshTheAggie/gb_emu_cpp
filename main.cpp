@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 #include "gb.h"
 #include "platform.h"
 #include "memory.h"
@@ -6,6 +7,7 @@
 memory sharedMemory;
 Platform * platform;
 gb cpu{};
+std::chrono::steady_clock::time_point currenttime, oldtime;
 
 int cpustep(){
     cpu.CPU_execute_op();
@@ -25,6 +27,12 @@ bool emulatorframe(){
     platform->Update(cpu.video);
     quit = platform->ProcessInput(sharedMemory.directions, sharedMemory.buttons);
     cpu.update_joypad_reg();
+    currenttime = std::chrono::steady_clock::now();
+    //std::cout << "Elapsed time in microseconds: " <<
+    //            std::chrono::duration_cast<std::chrono::microseconds>(currenttime - oldtime).count() << "us\n";
+    while (std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count() < 16700);
+    std::cout << "FPS: " << 1000000/(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count()) << "\n";
+    oldtime = std::chrono::steady_clock::now();
     return quit;
 }
 
@@ -49,6 +57,9 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
     std::printf(romFileName);
     std::printf("\n");
     bool quit = false;
+
+    currenttime = std::chrono::steady_clock::now();
+    oldtime = std::chrono::steady_clock::now();
 
     while(!quit)
     {

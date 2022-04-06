@@ -6,7 +6,7 @@
 
 #include <fstream>
 #include <iostream>
-#include <chrono>
+//#include <chrono>
 #include "ppu.h"
 #include "memory.h"
 

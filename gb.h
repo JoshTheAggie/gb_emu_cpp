@@ -23,14 +23,10 @@ const unsigned int VIDEO_HEIGHT = 144;
 extern memory sharedMemory;
 
 class gb {
-    //performance profiling
-    //std::time_t start, end;
     //debug
     int opscompleted = 0;
 
-    //sf::Clock clock;
-    //used for CPU speed regulation
-    uint32_t cycles_ran = 0;
+    //uint32_t cycles_ran = 0;
     uint8_t opcode;          //8-bit instructions
     //uint8_t memory [0x10000]{};    //64KiB of memory
     //uint8_t bootrom [256]{}; //256 byte bootstrap
@@ -97,7 +93,7 @@ class gb {
     static uint8_t get_bits_3_4(uint8_t op){ return (op & 0x18) >> 3; };
     static bool isbiton(uint8_t num, uint8_t testbyte){ return ((0x01 << num) & testbyte) != 0x0;};
 
-    void OP_NOP(){ cycle_delay(1); };
+    void OP_NOP(){ cyclecount++; };
     void OP_HALT();
     void OP_RST(uint8_t xxx);
     //todo: organize this list
@@ -164,35 +160,27 @@ class gb {
     void CB_BIT(uint8_t bbb, uint8_t xxx);
     void CB_SET(uint8_t bbb, uint8_t xxx);
     void CB_RES(uint8_t bbb, uint8_t xxx);
-    //helper functions for memory IO.
-    //makes it much easier to go back and add banking
-    //for now will be basic
+
     void write_mem(uint16_t address, uint8_t value);
-    //uint8_t read_mem(uint16_t address);
 
     //helper functions for registers
     uint8_t * decode_register(uint8_t xxx);
 
     //helper function for timing
-    void cycle_delay(uint8_t cycles);
+    //void cycle_delay(uint8_t cycles);
     //helper function for conditional testing
     bool test_condition(uint8_t cc) const;
 
     //timer counter
     int32_t timer_counter;
-    int32_t divider_counter;
+    uint32_t divider_counter;
 
-    //DMA transfer
-    //void performDMAtransfer(uint8_t data);
 public:
     //graphics
     ppu * gpu;
     uint32_t video [VIDEO_WIDTH * VIDEO_HEIGHT]{};
 
-    //uint8_t directions{0xFF}, buttons{0xFF};
-
     gb();
-    //void LoadROM(char const *filename);
     void CPU_execute_op();
     void update_joypad_reg();
     int32_t cyclecount;
@@ -202,7 +190,6 @@ public:
     static bool isclockenabled();
     void handle_div_reg(uint32_t cycles);
     void set_clock_freq();
-    const uint32_t CLOCKSPEED = 4194304;
 };
 
 #endif //GBEMUJM_GB_H

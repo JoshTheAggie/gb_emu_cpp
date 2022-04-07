@@ -113,7 +113,7 @@ bool gb::any_interrupts() {
             write_mem(SP--, (PC >> 8));
             write_mem(SP, (PC & 0xFF));
             PC = address;
-            cycle_delay(5); //pandocs speculates this is correct
+            //cycle_delay(5); //pandocs speculates this is correct
             return true;
         }
         else return false;
@@ -141,7 +141,7 @@ void gb::CPU_execute_op() {
 
         if (CB_instruction) {
             cyclecount += 1;
-            cycle_delay(1);
+            //cycle_delay(1);
             switch ((opcode & 0xF0u) >> 6) {
                 case 0: //00
                     switch (get_bits_3_5(opcode)) {
@@ -261,7 +261,7 @@ void gb::CPU_execute_op() {
 #ifdef DEBUG
                         std::printf("\n");
 #endif
-                        cycle_delay(1);
+                        //cycle_delay(1);
                         CB_instruction = true;
                     } else
                         switch (get_bits_0_2(opcode)) {
@@ -464,7 +464,7 @@ void gb::OP_RST(uint8_t xxx) {
 #endif
     PC = reset;
     cyclecount += 8;
-    cycle_delay(8);
+    //cycle_delay(8);
 }
 
 void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
@@ -492,7 +492,7 @@ void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
     printf("LD reg reg\n");
 #endif
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_LD_imm(uint8_t xxx) {
@@ -513,7 +513,7 @@ void gb::OP_LD_imm(uint8_t xxx) {
     printf("LD imm\n");
 #endif
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_LD_mem(uint8_t xxx) {
@@ -593,7 +593,7 @@ void gb::OP_LD_mem(uint8_t xxx) {
     if (increment) inc_HL();
     if (decrement) dec_HL();
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_LDH(uint8_t yyy) {
@@ -630,7 +630,7 @@ void gb::OP_LDH(uint8_t yyy) {
         write_mem(address, A);
     }
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_LD_imm16(uint8_t xx) {
@@ -667,7 +667,7 @@ void gb::OP_LD_imm16(uint8_t xx) {
             break;
     }
     cyclecount += 3;
-    cycle_delay(3);
+    //cycle_delay(3);
 }
 
 void gb::OP_STORE_SP() {
@@ -679,7 +679,7 @@ void gb::OP_STORE_SP() {
     printf("LD (a16) SP)\n");
 #endif
     cyclecount += 5;
-    cycle_delay(5);
+    //cycle_delay(5);
 }
 
 void gb::OP_INC_r(uint8_t xxx) {
@@ -707,7 +707,7 @@ void gb::OP_INC_r(uint8_t xxx) {
     set_N(false);
     set_H(((temp & 0xF) + 1) > 0xF);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_DEC_r(uint8_t xxx) {
@@ -735,7 +735,7 @@ void gb::OP_DEC_r(uint8_t xxx) {
     set_N(true);
     set_H(((temp & 0xF)) == 0x00);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_ADD16(uint8_t xx) {
@@ -769,7 +769,7 @@ void gb::OP_ADD16(uint8_t xx) {
     printf("ADD HL, rr\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_INC16(uint8_t xx) {
@@ -794,7 +794,7 @@ void gb::OP_INC16(uint8_t xx) {
     printf("INC rr\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_DEC16(uint8_t xx) {
@@ -819,7 +819,7 @@ void gb::OP_DEC16(uint8_t xx) {
     printf("DEC rr\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_DAA() {
@@ -835,12 +835,12 @@ void gb::OP_DAA() {
     printf("DAA\n");
 #endif
     cyclecount += 1;
-    cycle_delay(1);
+    //cycle_delay(1);
 }
 
 void gb::OP_CPL() {
     A = ~A;
-    cycle_delay(1);
+    //cycle_delay(1);
     cyclecount += 1;
 #ifdef DEBUG
     printf("CPL\n");
@@ -861,7 +861,7 @@ void gb::OP_CCF() {
     printf("CCF\n");
 #endif
     cyclecount += 1;
-    cycle_delay(1);
+    //cycle_delay(1);
 }
 
 void gb::OP_SCF() {
@@ -873,7 +873,7 @@ void gb::OP_SCF() {
     printf("SCF r\n");
 #endif
     cyclecount += 1;
-    cycle_delay(1);
+    //cycle_delay(1);
 }
 
 void gb::OP_rot_shift_A(uint8_t xxx) {
@@ -919,7 +919,7 @@ void gb::OP_rot_shift_A(uint8_t xxx) {
     }
     A = newA;
     cyclecount += 1;
-    cycle_delay(1);
+    //cycle_delay(1);
 }
 
 void gb::OP_ADD_r(uint8_t xxx) {
@@ -945,7 +945,7 @@ void gb::OP_ADD_r(uint8_t xxx) {
     A += val;
     set_Z(A == 0x00);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_ADC_r(uint8_t xxx) {
@@ -971,7 +971,7 @@ void gb::OP_ADC_r(uint8_t xxx) {
     A += val + get_C();
     set_Z(A == 0x00);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_SUB_r(uint8_t xxx) {
@@ -997,7 +997,7 @@ void gb::OP_SUB_r(uint8_t xxx) {
     A -= val;
     set_Z(A == 0x00);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_SBC_r(uint8_t xxx) {
@@ -1023,7 +1023,7 @@ void gb::OP_SBC_r(uint8_t xxx) {
     set_Z(A == 0x00);
     A -= (val + get_C());
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_AND_r(uint8_t xxx) {
@@ -1049,7 +1049,7 @@ void gb::OP_AND_r(uint8_t xxx) {
     set_H(true);
     set_C(false);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_OR_r(uint8_t xxx) {
@@ -1075,7 +1075,7 @@ void gb::OP_OR_r(uint8_t xxx) {
     set_H(false);
     set_C(false);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_XOR_r(uint8_t xxx) {
@@ -1101,7 +1101,7 @@ void gb::OP_XOR_r(uint8_t xxx) {
     set_H(false);
     set_C(false);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_CP_r(uint8_t xxx) {
@@ -1128,7 +1128,7 @@ void gb::OP_CP_r(uint8_t xxx) {
     set_H((A & 0xF) < (val & 0xF));
     set_C(A < val);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_LD_mem16() {
@@ -1151,7 +1151,7 @@ void gb::OP_LD_mem16() {
         write_mem(address, A);
     }
     cyclecount += 4;
-    cycle_delay(4);
+    //cycle_delay(4);
 }
 
 void gb::OP_LD_SP_HL() {
@@ -1160,7 +1160,7 @@ void gb::OP_LD_SP_HL() {
     printf("LD SP HL\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_PUSH_r(uint8_t xx) {
@@ -1198,7 +1198,7 @@ void gb::OP_PUSH_r(uint8_t xx) {
     SP--;
     write_mem(SP, (value & 0xFF));
     cyclecount += 4;
-    cycle_delay(4);
+    //cycle_delay(4);
 }
 
 void gb::OP_POP_r(uint8_t xx) {
@@ -1234,7 +1234,7 @@ void gb::OP_POP_r(uint8_t xx) {
             break;
     }
     cyclecount += 3;
-    cycle_delay(3);
+    //cycle_delay(3);
 }
 
 void gb::OP_LD_HL_SP_offset() {
@@ -1251,7 +1251,7 @@ void gb::OP_LD_HL_SP_offset() {
     set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
     set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
     cyclecount += 3;
-    cycle_delay(3);
+    //cycle_delay(3);
 }
 
 void gb::OP_ADD_SP() {
@@ -1268,7 +1268,7 @@ void gb::OP_ADD_SP() {
     set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
     SP += offset;
     cyclecount += 4;
-    cycle_delay(4);
+    //cycle_delay(4);
 }
 
 void gb::OP_DI() {
@@ -1277,7 +1277,7 @@ void gb::OP_DI() {
 #ifdef DEBUG
     printf("DI\n");
 #endif
-    cycle_delay(1);
+    //cycle_delay(1);
 }
 
 void gb::OP_EI() {
@@ -1286,7 +1286,7 @@ void gb::OP_EI() {
 #ifdef DEBUG
     printf("EI\n");
 #endif
-    cycle_delay(1);
+    //cycle_delay(1);
 }
 
 void gb::OP_ADD_A_imm() {
@@ -1300,7 +1300,7 @@ void gb::OP_ADD_A_imm() {
 #endif
     set_Z(A == 0x00);
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_ADC_A_imm() {
@@ -1314,7 +1314,7 @@ void gb::OP_ADC_A_imm() {
 #endif
     set_Z(A == 0x00);
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_SUB_A_imm() {
@@ -1328,7 +1328,7 @@ void gb::OP_SUB_A_imm() {
 #endif
     set_Z(A == 0x00);
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_SBC_A_imm() {
@@ -1342,7 +1342,7 @@ void gb::OP_SBC_A_imm() {
 #endif
     set_Z(A == 0x00);
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_AND_A_imm() {
@@ -1355,7 +1355,7 @@ void gb::OP_AND_A_imm() {
     printf("AND A, imm\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_OR_A_imm() {
@@ -1368,7 +1368,7 @@ void gb::OP_OR_A_imm() {
     printf("OR A, imm\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_XOR_A_imm() {
@@ -1381,7 +1381,7 @@ void gb::OP_XOR_A_imm() {
     printf("XOR A, imm\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_CP_A_imm() {
@@ -1394,7 +1394,7 @@ void gb::OP_CP_A_imm() {
     printf("CP A, imm\n");
 #endif
     cyclecount += 2;
-    cycle_delay(2);
+    //cycle_delay(2);
 }
 
 void gb::OP_JP() {
@@ -1406,7 +1406,7 @@ void gb::OP_JP() {
     printf("JP 0x%X\n", address);
 #endif
     cyclecount += 4;
-    cycle_delay(4);
+    //cycle_delay(4);
 }
 
 void gb::OP_JP_HL() {
@@ -1415,7 +1415,7 @@ void gb::OP_JP_HL() {
     printf("JP (HL)\n");
 #endif
     cyclecount += 1;
-    cycle_delay(1);
+    //cycle_delay(1);
 }
 
 void gb::OP_JP_test(uint8_t xx) {
@@ -1433,7 +1433,7 @@ void gb::OP_JP_test(uint8_t xx) {
     printf("JP cc 0x%X\n", address);
 #endif
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_JR() {
@@ -1444,7 +1444,7 @@ void gb::OP_JR() {
     printf("JR 0x%X\n", PC);
 #endif
     cyclecount += 3;
-    cycle_delay(3);
+    //cycle_delay(3);
 }
 
 void gb::OP_JR_test(uint8_t cc) {
@@ -1461,7 +1461,7 @@ void gb::OP_JR_test(uint8_t cc) {
     printf("JR cc 0x%X\n", PC + offset);
 #endif
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_CALL() {
@@ -1477,7 +1477,7 @@ void gb::OP_CALL() {
     printf("CALL 0x%X\n", address);
 #endif
     cyclecount += 6;
-    cycle_delay(6);
+    //cycle_delay(6);
 }
 
 void gb::OP_CALL_test(uint8_t xx) {
@@ -1496,7 +1496,7 @@ void gb::OP_CALL_test(uint8_t xx) {
     printf("CALL cc 0x%X\n", address);
 #endif
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_RET() {
@@ -1508,7 +1508,7 @@ void gb::OP_RET() {
     printf("RET to 0x%X\n", newPC);
 #endif
     cyclecount += 4;
-    cycle_delay(4);
+    //cycle_delay(4);
 }
 
 void gb::OP_RET_test(uint8_t xx) {
@@ -1527,7 +1527,7 @@ void gb::OP_RET_test(uint8_t xx) {
     else printf("RET cc not taken\n");
 #endif
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::OP_RETI() {
@@ -1539,7 +1539,7 @@ void gb::OP_RETI() {
     printf("RETI to 0x%X\n", newPC);
 #endif
     cyclecount += 4;
-    cycle_delay(4);
+    //cycle_delay(4);
 }
 
 void gb::CB_RLC(uint8_t xxx) {
@@ -1573,7 +1573,7 @@ void gb::CB_RLC(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_RL(uint8_t xxx) {
@@ -1602,7 +1602,7 @@ void gb::CB_RL(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_RRC(uint8_t xxx) {
@@ -1636,7 +1636,7 @@ void gb::CB_RRC(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_RR(uint8_t xxx) {
@@ -1670,7 +1670,7 @@ void gb::CB_RR(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_SLA(uint8_t xxx) {
@@ -1700,7 +1700,7 @@ void gb::CB_SLA(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_SRA(uint8_t xxx) {
@@ -1734,7 +1734,7 @@ void gb::CB_SRA(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_SWAP(uint8_t xxx) {
@@ -1764,7 +1764,7 @@ void gb::CB_SWAP(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_SRL(uint8_t xxx) {
@@ -1794,7 +1794,7 @@ void gb::CB_SRL(uint8_t xxx) {
     set_N(false);
     set_Z(result == 0);
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
@@ -1815,7 +1815,7 @@ void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
     set_N(false);
     set_Z(isbiton(bbb, temp));
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
@@ -1838,7 +1838,7 @@ void gb::CB_SET(uint8_t bbb, uint8_t xxx) {
     }
     //flags are not affected here
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
@@ -1861,7 +1861,7 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
     }
     //flags are not affected here
     cyclecount += delay;
-    cycle_delay(delay);
+    //cycle_delay(delay);
 }
 
 void gb::write_mem(uint16_t address, uint8_t value) {
@@ -1903,7 +1903,7 @@ uint8_t *gb::decode_register(uint8_t xxx) {
     }
 }
 
-void gb::cycle_delay(uint8_t cycles) {
+/*void gb::cycle_delay(uint8_t cycles) {
     cycles_ran += cycles;
     if (cycles_ran >= 4194) //approximately the number of cycles in 1 ms (4194.304)
     {
@@ -1911,7 +1911,7 @@ void gb::cycle_delay(uint8_t cycles) {
         cycles_ran = 0;
         //while(clock.getElapsedTime().asMilliseconds() < 1); //yep, just NOP
     }
-}
+}*/
 
 uint16_t gb::HL() const {
     return (H << 8) + L;
@@ -1993,9 +1993,9 @@ void gb::write_AF(uint16_t value) {
 }
 
 void gb::update_timers(uint32_t cycles) {
-    handle_div_reg(cycles);
+    handle_div_reg(cycles*4);
     if(isclockenabled()){
-        timer_counter -= cycles;
+        timer_counter -= (cycles * 4);
 
         // have enough cpu cycles happened to update timer?
         if (timer_counter <= 0)

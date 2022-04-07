@@ -26,10 +26,10 @@ memory::memory() {
         //free the buffer
         delete[] buffer;
     }
-    /*else
+    else
     {
         std::cerr << "Cannot load boot rom!\n";
-    }*/
+    }
 }
 
 void memory::write_mem(uint16_t address, uint8_t value) {
@@ -146,10 +146,10 @@ void memory::LoadROM(const char *filename) {
                 system_mem[i] = cartridge_rom[i];
         }
     }
-    /*else
+    else
     {
         std::cerr << "Cannot open ROM file!\n";
-    }*/
+    }
 }
 
 void memory::incrementLY() {

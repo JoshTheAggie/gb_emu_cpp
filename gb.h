@@ -2,11 +2,10 @@
 // Created by joshua on 5/23/20.
 //
 
-//#define DEBUG
+#define DEBUG
 
 #include <fstream>
 #include <iostream>
-//#include <chrono>
 #include "ppu.h"
 #include "memory.h"
 

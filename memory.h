@@ -6,6 +6,7 @@
 #define GBEMUJM_MEMORY_H
 
 #include <fstream>
+#include <iostream>
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;

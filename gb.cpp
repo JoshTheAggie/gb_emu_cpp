@@ -127,6 +127,7 @@ void gb::request_interrupt(uint8_t irq_num) {
 }
 
 void gb::CPU_execute_op() {
+    cyclecount = 0;
     //TODO: ensure interrupt handler works
     if(!any_interrupts()) {
         //fetch instruction

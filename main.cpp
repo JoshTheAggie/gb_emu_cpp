@@ -19,10 +19,10 @@ int cpustep(){
 
 bool emulatorframe(){
     bool quit = false;
-    const int MAXCYCLES = 69905;
+    const int MAXCYCLES = 17476;
     int cycles_since_last_screen = 0;
     while (cycles_since_last_screen < MAXCYCLES){
-        cycles_since_last_screen += (4 * cpustep());
+        cycles_since_last_screen += cpustep();
     }
     cycles_since_last_screen = 0;
     platform->Update(cpu.video);
@@ -30,9 +30,9 @@ bool emulatorframe(){
     cpu.update_joypad_reg();
     //keep frames limited to 60 FPS
     currenttime = std::chrono::steady_clock::now();
-    //while (std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count() < 16200)
-        //std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    //std::cout << "FPS: " << 1000000/(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count()) << "\n";
+    while (std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count() < 16200)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::cout << "FPS: " << 1000000/(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - oldtime).count()) << "\n";
     oldtime = std::chrono::steady_clock::now();
     return quit;
 }

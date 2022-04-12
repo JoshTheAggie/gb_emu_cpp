@@ -1965,11 +1965,11 @@ bool gb::test_condition(uint8_t cc) const {
             //NZ
             test = !isbiton(7, F);
             break;
-        case 1:
+        case 2:
             //NC
             test = !isbiton(4, F);
             break;
-        case 2:
+        case 1:
             //Z
             test = isbiton(7, F);
             break;

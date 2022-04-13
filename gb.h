@@ -190,6 +190,9 @@ public:
     static bool isclockenabled();
     void handle_div_reg(uint32_t cycles);
     void set_clock_freq();
+
+    uint8_t get_H() const;
+    uint8_t get_N() const;
 };
 
 #endif //GBEMUJM_GB_H

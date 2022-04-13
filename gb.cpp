@@ -832,13 +832,29 @@ void gb::OP_DEC16(uint8_t xx) {
 
 void gb::OP_DAA() {
     //DAA decimal adjust A (BCD format)
-    uint8_t ones = A;
-    uint8_t tens = A/10;
-    ones %= 10;
-    A = (tens << 4) + ones;
+    //uint8_t ones = A;
+    //uint8_t tens = A/10;
+    //ones %= 10;
+    //A = (tens << 4) + ones;
+
+    if(get_N()){
+        if(get_C())
+            A -= 0x60;
+        if(get_H())
+            A -= 0x6;
+    }
+    else{
+        if(get_C() || A > 0x99){
+            A += 0x60;
+            set_C(true);
+        }
+        if(get_H() || (A & 0xF) > 0x9)
+            A += 0x6;
+    }
+
     set_Z(A == 0);
     set_H(false);
-    set_C(tens > 9);
+    //set_C(tens > 9);
 #ifdef DEBUG
     printf("DAA\n");
 #endif
@@ -1261,8 +1277,10 @@ void gb::OP_LD_HL_SP_offset() {
 #endif
     set_Z(false);
     set_N(false);
-    set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
-    set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
+    //set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
+    //set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
+    set_H(((offset & 0x000F) + (SP & 0x000F)) > 0x000F);
+    set_C(((offset & 0x00FF) + (SP & 0x00FF)) > 0x00FF);
     cyclecount += 3;
     //cycle_delay(3);
 }
@@ -1277,8 +1295,8 @@ void gb::OP_ADD_SP() {
 #endif
     set_Z(false);
     set_N(false);
-    set_H(((uint32_t)offset & 0x0FFF) + ((uint32_t)SP & 0x0FFF) > 0x0FFF);
-    set_C(((uint32_t)offset + (uint32_t)SP) > 0xFFFF);
+    set_H(((offset & 0x000F) + (SP & 0x000F)) > 0x000F);
+    set_C(((offset & 0x00FF) + (SP & 0x00FF)) > 0x00FF);
     SP += offset;
     cyclecount += 4;
     //cycle_delay(4);
@@ -1831,7 +1849,7 @@ void gb::CB_BIT(uint8_t bbb, uint8_t xxx) {
     }
     set_H(true);
     set_N(false);
-    set_Z(isbiton(bbb, temp));
+    set_Z(!isbiton(bbb, temp));
     cyclecount += delay;
     //cycle_delay(delay);
 }
@@ -2004,6 +2022,14 @@ void gb::write_AF(uint16_t value) {
 
 uint8_t gb::get_C() const {
     return ((F & 0x10) >> 4);
+}
+
+uint8_t gb::get_H() const {
+    return ((F & 0x20) >> 5);
+}
+
+uint8_t gb::get_N() const {
+    return ((F & 0x40) >> 6);
 }
 
 bool gb::test_condition(uint8_t cc) const {

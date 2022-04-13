@@ -1,41 +1,22 @@
-01 - special
-DAA
+02-interrupts.gb
+EI
 
-03 - SP, HL
-E8
-E8
-F8
-F8
 
-07 - jr,jp,call,ret,rst
-C7
-CF
-D7
-DF
-E7
-EF
-F7
-FF
+07-jr,jp,call,ret,rst.gb
+C7    RST 00
+CF    RST 08
+D7    RST 10
+DF    RST 18
+E7    RST 20
+EF    RST 28
+F7    RST 30
+FF    RST 38
 
-10 - CB bit ops
-40-47
-48-4F
-50-57
-58-5F
-60-67
-68-6F
-70-77
-78-7F
 
-11 - a, (hl)
-CB 46
-CB 4E
-CB 56
-CB 5E
-CB 66
-CB 6E
-CB 76
-CB 7E
-27
 
+
+todo: learn about the DAA instruction
+
+Z N H C
+7 6 5 4
 

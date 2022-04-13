@@ -7,7 +7,7 @@
 gb::gb()
 {
     //initialize PC
-    PC = 0x0u;
+    PC = 0x100u;
     CB_instruction = false;
     IME = false;
     enable_interrupts = false;
@@ -76,7 +76,7 @@ gb::gb()
     sharedMemory.write_mem(0xFF4B, 0x00);
     sharedMemory.write_mem(0xFF4D, 0xFF);
     sharedMemory.write_mem(0xFF4F, 0xFF);
-    sharedMemory.write_mem(0xFF50, 0x00); // if nonzero, bootrom is disabled
+    sharedMemory.write_mem(0xFF50, 0x01); // if nonzero, bootrom is disabled
     sharedMemory.write_mem(0xFF51, 0xFF);
     sharedMemory.write_mem(0xFF52, 0xFF);
     sharedMemory.write_mem(0xFF53, 0xFF);
@@ -134,7 +134,9 @@ void gb::CPU_execute_op() {
         opcode = sharedMemory.read_mem(PC);
         //output for debug
 #ifdef DEBUG
-        std::printf("pc:  %x\topcode:  %x\t", PC, opcode);
+        std::printf("pc:  %x\topcode:  %x\t\t", PC, opcode);
+        while(PC == 0xCB44);
+        //opscompleted++;
 #endif
         //increment pc before doing anything
         PC++;
@@ -191,7 +193,12 @@ void gb::CPU_execute_op() {
                             else if (opcode == 0x10) OP_STOP();
                             else if (opcode == 0x18) OP_JR();
                             else if (isbiton(5, opcode)) OP_JR_test(get_bits_3_4(opcode));
-                            else OP_NOP();
+                            else {
+#ifdef DEBUG
+                                printf("NOP\n");
+#endif
+                                OP_NOP();
+                            }
                             break;
                         case 1:
                             if (isbiton(3, opcode)) OP_ADD16(get_bits_4_5(opcode));
@@ -261,7 +268,7 @@ void gb::CPU_execute_op() {
 #ifdef DEBUG
                         std::printf("\n");
 #endif
-                        //cycle_delay(1);
+                        cyclecount++;
                         CB_instruction = true;
                     } else
                         switch (get_bits_0_2(opcode)) {
@@ -296,6 +303,7 @@ void gb::CPU_execute_op() {
                                     case 4:
                                     case 6:
                                         OP_POP_r(get_bits_4_5(opcode));
+                                        break;
                                 }
                                 break;
                             case 2:
@@ -642,25 +650,25 @@ void gb::OP_LD_imm16(uint8_t xx) {
         case 0:
             write_BC(imm);
 #ifdef DEBUG
-            printf("LD BD, d16\n");
+            printf("LD BC, $%X\n", imm);
 #endif
             break;
         case 1:
             write_DE(imm);
 #ifdef DEBUG
-            printf("LD DE, d16\n");
+            printf("LD DE, $%X\n", imm);
 #endif
             break;
         case 2:
             write_HL(imm);
 #ifdef DEBUG
-            printf("LD HL, d16\n");
+            printf("LD HL, $%X\n", imm);
 #endif
             break;
         case 3:
             SP = imm;
 #ifdef DEBUG
-            printf("LD SP, d16\n");
+            printf("LD SP, $%X\n", imm);
 #endif
             break;
         default:
@@ -676,7 +684,7 @@ void gb::OP_STORE_SP() {
     write_mem(address, (SP & 0xFF));
     write_mem(address+1, (SP >> 8));
 #ifdef DEBUG
-    printf("LD (a16) SP)\n");
+    printf("LD ($%X) SP)\n", address);
 #endif
     cyclecount += 5;
     //cycle_delay(5);
@@ -885,15 +893,15 @@ void gb::OP_rot_shift_A(uint8_t xxx) {
 #ifdef DEBUG
             printf("RLCA\n");
 #endif
-            newA = A << 1;
-            set_C((newA >> 8) == 1);
+            newA = (A << 1) + (A >> 7);
+            set_C(isbiton(7, A));
             break;
         case 1:
             //RRCA
 #ifdef DEBUG
             printf("RRCA\n");
 #endif
-            newA = A >> 1;
+            newA = (A >> 1) + (A << 7);
             set_C(isbiton(0, A));
             break;
         case 2:
@@ -918,6 +926,9 @@ void gb::OP_rot_shift_A(uint8_t xxx) {
             break;
     }
     A = newA;
+    set_H(false);
+    set_Z(false);
+    set_N(false);
     cyclecount += 1;
     //cycle_delay(1);
 }
@@ -940,7 +951,7 @@ void gb::OP_ADD_r(uint8_t xxx) {
         val = *reg;
     }
     set_N(false);
-    set_H((A & 0xF + val & 0xF) > 0xF);
+    set_H(((A & 0xF) + (val & 0xF)) > 0x0F);
     set_C(((uint16_t)A + (uint16_t)(val)) > 0xFF);
     A += val;
     set_Z(A == 0x00);
@@ -952,6 +963,7 @@ void gb::OP_ADC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
     uint8_t val;
+    uint8_t tempC = get_C();
     if (xxx == 0x6) {
 #ifdef DEBUG
         printf("ADC (HL)\n");
@@ -966,9 +978,9 @@ void gb::OP_ADC_r(uint8_t xxx) {
         val = *reg;
     }
     set_N(false);
-    set_H((A & 0xF + val & 0xF + get_C()) > 0xF);
-    set_C(((uint16_t)A + (uint16_t)val + get_C()) > 0xFF);
-    A += val + get_C();
+    set_H(((A & 0xF) + (val & 0xF) + tempC) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)val + tempC) > 0xFF);
+    A += (val + tempC);
     set_Z(A == 0x00);
     cyclecount += delay;
     //cycle_delay(delay);
@@ -1004,6 +1016,7 @@ void gb::OP_SBC_r(uint8_t xxx) {
     uint8_t delay = 1;
     uint8_t * reg = decode_register(xxx);
     uint8_t val;
+    uint8_t tempC = get_C();
     if (xxx == 0x6) {
         delay = 2;
         val = sharedMemory.read_mem(HL());
@@ -1018,10 +1031,10 @@ void gb::OP_SBC_r(uint8_t xxx) {
         val = *reg;
     }
     set_N(true);
-    set_H((A & 0xF) < (val & 0xF + get_C()));
-    set_C(A < (val + get_C()));
+    set_H((A & 0xF) < ((val & 0xF) + tempC));
+    set_C(A < (val + tempC));
+    A -= (val + tempC);
     set_Z(A == 0x00);
-    A -= (val + get_C());
     cyclecount += delay;
     //cycle_delay(delay);
 }
@@ -1225,7 +1238,7 @@ void gb::OP_POP_r(uint8_t xx) {
 #endif
             break;
         case 3:
-            write_AF(data);
+            write_AF(data & 0xFFF0);
 #ifdef DEBUG
             printf("POP AF\n");
 #endif
@@ -1260,7 +1273,7 @@ void gb::OP_ADD_SP() {
     if (isbiton(7, offset))
         offset += 0xFF00;
 #ifdef DEBUG
-    printf("ADD SP s8\n");
+    printf("ADD SP $%X\n", offset);
 #endif
     set_Z(false);
     set_N(false);
@@ -1292,7 +1305,7 @@ void gb::OP_EI() {
 void gb::OP_ADD_A_imm() {
     uint8_t temp = sharedMemory.read_mem(PC++);
     set_N(false);
-    set_H((A & 0xF + temp & 0xF) > 0xF);
+    set_H(((A & 0xF) + (temp & 0xF)) > 0x0F);
     set_C(((uint16_t)A + (uint16_t)(temp)) > 0xFF);
     A += temp;
 #ifdef DEBUG
@@ -1305,10 +1318,11 @@ void gb::OP_ADD_A_imm() {
 
 void gb::OP_ADC_A_imm() {
     uint8_t temp = sharedMemory.read_mem(PC++);
+    uint8_t tempC = get_C();
     set_N(false);
-    set_H((A & 0xF + temp & 0xF + get_C()) > 0xF);
-    set_C(((uint16_t)A + (uint16_t)(temp) + get_C()) > 0xFF);
-    A += temp + get_C();
+    set_H(((A & 0xF) + (temp & 0xF) + tempC) > 0xF);
+    set_C(((uint16_t)A + (uint16_t)(temp) + tempC) > 0xFF);
+    A += (temp + tempC);
 #ifdef DEBUG
     printf("ADC A, 0x%X\n", temp);
 #endif
@@ -1333,10 +1347,11 @@ void gb::OP_SUB_A_imm() {
 
 void gb::OP_SBC_A_imm() {
     uint8_t temp = sharedMemory.read_mem(PC++);
+    uint8_t tempC = get_C();
     set_N(true);
-    set_H((A & 0xF) < (temp & 0xF + get_C()));
-    set_C((A < (temp + get_C())));
-    A -= (temp + get_C());
+    set_H((A & 0xF) < ((temp & 0xF) + tempC));
+    set_C((A < (temp + tempC)));
+    A -= (temp + tempC);
 #ifdef DEBUG
     printf("SBC A, 0x%X\n", temp);
 #endif
@@ -1451,14 +1466,17 @@ void gb::OP_JR_test(uint8_t cc) {
     uint8_t delay = 2;
     uint16_t offset = sharedMemory.read_mem(PC++);
     if (isbiton(7, offset)) offset += 0xFF00;
-    //printf("JR (jump relative) cc %X\n", offset);
     if(test_condition(cc)){
-        //printf("Jumping now...\n");
-        PC = PC + offset;
+        //printf("Jumping now... ");
+        PC = (PC + offset) & 0xFFFF;
         delay++;
+#ifdef DEBUG
+        printf("JR cc 0x%X, branch taken\n", PC);
+#endif
     }
 #ifdef DEBUG
-    printf("JR cc 0x%X\n", PC + offset);
+    else
+        printf("JR cc 0x%X\n", PC);
 #endif
     cyclecount += delay;
     //cycle_delay(delay);
@@ -1866,8 +1884,7 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
 
 void gb::write_mem(uint16_t address, uint8_t value) {
 #ifdef DEBUG
-    if (address != 0xFF00)
-        printf("write_mem. A: 0x%X D: 0x%X\n",address, value);
+    //printf("write_mem. A: 0x%X D: 0x%X\n",address, value);
 #endif
     if (address == 0xFF07)
     {
@@ -1883,20 +1900,41 @@ uint8_t *gb::decode_register(uint8_t xxx) {
     switch (xxx)
     {
         case 0:
+#ifdef DEBUG
+            printf("B ");
+#endif
             return &B;
         case 1:
+#ifdef DEBUG
+            printf("C ");
+#endif
             return &C;
         case 2:
+#ifdef DEBUG
+            printf("D ");
+#endif
             return &D;
         case 3:
+#ifdef DEBUG
+            printf("E ");
+#endif
             return &E;
         case 4:
+#ifdef DEBUG
+            printf("H ");
+#endif
             return &H;
         case 5:
+#ifdef DEBUG
+            printf("L ");
+#endif
             return &L;
         case 6:
             return nullptr;
         case 7:
+#ifdef DEBUG
+            printf("A ");
+#endif
             return  &A;
         default:
             return nullptr;
@@ -1954,6 +1992,16 @@ void gb::write_DE(uint16_t value) {
     E = value & 0xFF;
 }
 
+uint16_t gb::AF() const {
+    return (A << 8) + F;
+}
+
+void gb::write_AF(uint16_t value) {
+    A = (value >> 8);
+    F = (value & 0xFF);
+}
+
+
 uint8_t gb::get_C() const {
     return ((F & 0x10) >> 4);
 }
@@ -1983,14 +2031,6 @@ bool gb::test_condition(uint8_t cc) const {
     return test;
 }
 
-uint16_t gb::AF() const {
-    return (A << 8) + F;
-}
-
-void gb::write_AF(uint16_t value) {
-    A = value >> 8;
-    F = value & 0xFF;
-}
 
 void gb::update_timers(uint32_t cycles) {
     handle_div_reg(cycles*4);

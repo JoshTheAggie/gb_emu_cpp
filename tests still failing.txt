@@ -1,0 +1,41 @@
+01 - special
+DAA
+
+03 - SP, HL
+E8
+E8
+F8
+F8
+
+07 - jr,jp,call,ret,rst
+C7
+CF
+D7
+DF
+E7
+EF
+F7
+FF
+
+10 - CB bit ops
+40-47
+48-4F
+50-57
+58-5F
+60-67
+68-6F
+70-77
+78-7F
+
+11 - a, (hl)
+CB 46
+CB 4E
+CB 56
+CB 5E
+CB 66
+CB 6E
+CB 76
+CB 7E
+27
+
+

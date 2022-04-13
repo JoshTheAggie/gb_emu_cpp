@@ -7,7 +7,7 @@
 memory::memory() {
     //load boot rom
     //open file as binary stream and move file pointer to end
-    std::ifstream file("mgb_boot.bin", std::ios::binary | std::ios::ate);
+    std::ifstream file("gb_bios.bin", std::ios::binary | std::ios::ate);
     if(file.is_open())
     {
         char* buffer = new char[256];
@@ -34,11 +34,18 @@ memory::memory() {
 
 void memory::write_mem(uint16_t address, uint8_t value) {
 //todo: implement rom banking, any other indirection, etc.
-    //todo: go back and replace all the memory[] writes
     //don't allow writes to read-only memory
     if (address < 0x8000)
     {
-        //printf("Attempted write to ROM, address %x\n", address);
+        handlebanking(address, value);
+    }
+    else if (address >= 0xA000 & address < 0xC000)
+    {
+        if (enableRAM)
+        {
+            uint16_t newaddress = address - 0xA000;
+            rambanks[newaddress + (currentRAMbank * 0x2000)] = value;
+        }
     }
         // writes to ECHO RAM writes to RAM as well
     else if ((address >= 0xE000) && (address < 0xFE00))
@@ -74,7 +81,7 @@ void memory::write_mem(uint16_t address, uint8_t value) {
         system_mem[address] = value;
 }
 
-uint8_t memory::read_mem(uint16_t address) {
+uint8_t memory::read_mem(uint16_t address) const {
     //todo: go back and replace all the '&memory[HL()]' calls
     if (address == 0xFF00){
         //joypad register
@@ -95,11 +102,18 @@ uint8_t memory::read_mem(uint16_t address) {
     {
         return bootrom[address];
     }
-    else if (address >= 0x104 && address < 0x133) {
-        //printf("Logo. Address: %X\t Data: %X\n", address, system_mem[address]);
-        return system_mem[address];
+    else if (address >= 0x4000 && address < 0x8000) {
+        //reading from ROM bank
+        uint16_t newaddress = address - 0x4000;
+        return cartridge_rom[newaddress + (currentROMbank * 0x4000)];
     }
-    else //todo: more banking shiz
+    else if (address >= 0xA000 && address < 0xC000)
+    {
+        //reading from RAM bank
+        uint16_t newaddress = address - 0xA000;
+        return rambanks[newaddress + (currentRAMbank * 0x2000)];
+    }
+    else
         return system_mem[address];
 }
 
@@ -150,8 +164,101 @@ void memory::LoadROM(const char *filename) {
     {
         std::cerr << "Cannot open ROM file!\n";
     }
+
+    //detect ROM banking
+    switch (system_mem[0x147])
+    {
+        case 1:
+        case 2:
+        case 3:
+            mbc_type = MBC1;
+            break;
+        case 5:
+        case 6:
+            mbc_type = MBC2;
+            break;
+        default:
+            break;
+
+    }
 }
 
 void memory::incrementLY() {
     system_mem[0xFF44]++;
+}
+
+void memory::handlebanking(uint16_t address, uint8_t value) {
+    //do RAM enable
+    if (address < 0x2000)
+    {
+        if(mbc_type == MBC1 || mbc_type == MBC2)
+        {
+            rambankenable(address, value);
+        }
+    }
+
+    //do ROM bank change
+    else if (address >= 0x200 && address < 0x4000)
+    {
+        if (mbc_type == MBC1 || mbc_type == MBC2)
+            changeLorombank(value);
+    }
+
+    //do ROM or RAM bank change
+    else if (address >= 0x4000 && address < 0x6000)
+    {
+        if (mbc_type == MBC1)
+        {
+            if(rombanking) changeHirombank(value);
+
+            else rambankchange(value);
+        }
+    }
+
+    //change banking mode - rom or ram banking
+    else if (address >= 0x6000 && address < 0x8000)
+    {
+        if (mbc_type == MBC1)
+            changeromrammode(value);
+    }
+}
+
+void memory::rambankenable(uint16_t address, uint8_t data) {
+    if(mbc_type == MBC2)
+    {
+        if ((address & 0x10) != 0) return;
+    }
+
+    if ((data & 0xF) == 0xA) enableRAM = true;
+    else if ((data & 0xF) == 0x0) enableRAM = false;
+}
+
+void memory::changeLorombank(uint8_t data) {
+    if (mbc_type == MBC2)
+    {
+        currentROMbank = data & 0xF;
+        if (currentROMbank == 0) currentROMbank++;
+        return;
+    }
+    currentROMbank &= 0xE0; //turn off the lower 5 bits
+    currentROMbank |= (data & 0x1F); //superimpose lower 5 from data
+    if (currentROMbank == 0) currentROMbank++;
+}
+
+void memory::changeHirombank(uint8_t data) {
+    //change upper ROM bank number bits in MBC1 mode
+    currentROMbank &= 0x1F; //turn off upper 3 bits
+    data &= 0xE0; //turn off lower 5 bits of data
+    currentROMbank |= data;
+    if (currentROMbank == 0) currentROMbank++;
+}
+
+void memory::rambankchange(uint8_t data) {
+    currentRAMbank = data & 0x3;
+}
+
+void memory::changeromrammode(uint8_t data) {
+    rombanking = ((data & 0x1) == 0);
+    if (rombanking) currentRAMbank = 0;
+    //GB can only access RAM bank 0 while ROM banking
 }

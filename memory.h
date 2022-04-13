@@ -12,17 +12,33 @@ typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 
+enum MBC {NONE, MBC1, MBC2};
+
 class memory {
     uint8_t system_mem [0x10000]{};    //64KiB of memory
     uint8_t bootrom [256]{}; //256 byte bootstrap
     uint8_t cartridge_rom [0x200000]{}; //cartridge rom
+    //rom banking
+    MBC mbc_type = NONE;
+    uint8_t currentROMbank = 1;
+    //ram banks
+    uint8_t rambanks [0x8000]{};
+    uint8_t currentRAMbank = 0;
+    void handlebanking(uint16_t address, uint8_t value);
+    bool enableRAM = false;
+    bool rombanking = false;
+    void rambankenable(uint16_t address, uint8_t data);
+    void changeLorombank(uint8_t data);
+    void changeHirombank(uint8_t data);
+    void rambankchange(uint8_t data);
+    void changeromrammode(uint8_t data);
 public:
     uint8_t buttons = 0xFF;
     uint8_t directions = 0xFF;
     memory();
 
     void write_mem(uint16_t address, uint8_t value);
-    uint8_t read_mem(uint16_t address);
+    uint8_t read_mem(uint16_t address) const;
     void performDMAtransfer(uint8_t data);
     void LoadROM(char const *filename);
     void incrementLY();

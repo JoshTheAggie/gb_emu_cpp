@@ -425,7 +425,8 @@ void gb::OP_HALT() {
     printf("HALT\n");
 #endif
     //HALT: power down CPU until an interrupt
-    while (sharedMemory.read_mem(0xFF0F) == 0) ;
+    if ((sharedMemory.read_mem(0xFF0F) & sharedMemory.read_mem(0xFFFF)) == 0)
+        PC--;
 }
 
 void gb::OP_STOP() {

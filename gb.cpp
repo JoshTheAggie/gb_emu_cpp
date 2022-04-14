@@ -7,7 +7,7 @@
 gb::gb()
 {
     //initialize PC
-    PC = 0x100u;
+    PC = 0x0u;
     CB_instruction = false;
     IME = false;
     enable_interrupts = false;
@@ -76,7 +76,7 @@ gb::gb()
     sharedMemory.write_mem(0xFF4B, 0x00);
     sharedMemory.write_mem(0xFF4D, 0xFF);
     sharedMemory.write_mem(0xFF4F, 0xFF);
-    sharedMemory.write_mem(0xFF50, 0x01); // if nonzero, bootrom is disabled
+    sharedMemory.write_mem(0xFF50, 0x00); // if nonzero, bootrom is disabled
     sharedMemory.write_mem(0xFF51, 0xFF);
     sharedMemory.write_mem(0xFF52, 0xFF);
     sharedMemory.write_mem(0xFF53, 0xFF);
@@ -471,6 +471,10 @@ void gb::OP_RST(uint8_t xxx) {
 #ifdef DEBUG
     printf("RST %X\n", reset);
 #endif
+    //push PC onto stack
+    SP--;
+    sharedMemory.write_mem(SP--, (PC >> 8)); //MSB
+    sharedMemory.write_mem(SP, (PC & 0xFF)); //LSB
     PC = reset;
     cyclecount += 8;
     //cycle_delay(8);

@@ -7,7 +7,7 @@
 memory::memory() {
     //load boot rom
     //open file as binary stream and move file pointer to end
-    std::ifstream file("gb_bios.bin", std::ios::binary | std::ios::ate);
+    std::ifstream file("mgb_boot.bin", std::ios::binary | std::ios::ate);
     if(file.is_open())
     {
         char* buffer = new char[256];

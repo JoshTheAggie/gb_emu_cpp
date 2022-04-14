@@ -12,8 +12,8 @@ std::chrono::steady_clock::time_point currenttime, oldtime;
 
 int cpustep(){
     cpu.CPU_execute_op();
-    cpu.update_timers(cpu.cyclecount);
-    cpu.gpu->update_graphics(cpu.cyclecount);
+    cpu.update_timers(cpu.cyclecount*4);
+    cpu.gpu->update_graphics(cpu.cyclecount*4);
     return cpu.cyclecount;
 }
 

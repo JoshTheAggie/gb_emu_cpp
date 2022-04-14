@@ -63,6 +63,7 @@ class gb {
     bool IME;
     bool enable_interrupts;
     bool disable_interrupts;
+    bool halt = false;
 
     bool any_interrupts();
     void request_interrupt(uint8_t irq_num);

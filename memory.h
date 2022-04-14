@@ -26,7 +26,7 @@ class memory {
     uint8_t currentRAMbank = 0;
     void handlebanking(uint16_t address, uint8_t value);
     bool enableRAM = false;
-    bool rombanking = false;
+    bool rombanking = true;
     void rambankenable(uint16_t address, uint8_t data);
     void changeLorombank(uint8_t data);
     void changeHirombank(uint8_t data);
@@ -39,6 +39,7 @@ public:
 
     void write_mem(uint16_t address, uint8_t value);
     uint8_t read_mem(uint16_t address) const;
+    void request_interrupt(uint8_t irq_num);
     void performDMAtransfer(uint8_t data);
     void LoadROM(char const *filename);
     void incrementLY();

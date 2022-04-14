@@ -39,8 +39,7 @@ gb::gb()
     sharedMemory.write_mem(0xFF04, 0xAB);
     sharedMemory.write_mem(0xFF05, 0x00);
     sharedMemory.write_mem(0xFF06, 0x00);
-    sharedMemory.write_mem(0xFF07, 0xF8);
-    sharedMemory.write_mem(0xFF0F, 0xE1); //IF register - interrupts
+    write_mem(0xFF07, 0xF8);
     sharedMemory.write_mem(0xFF10, 0x80);
     sharedMemory.write_mem(0xFF11, 0xBF);
     sharedMemory.write_mem(0xFF12, 0xF3);
@@ -88,6 +87,7 @@ gb::gb()
     sharedMemory.write_mem(0xFF6A, 0xFF);
     sharedMemory.write_mem(0xFF6B, 0xFF);
     sharedMemory.write_mem(0xFF70, 0xFF);
+    sharedMemory.write_mem(0xFF0F, 0xE1); //IF register - interrupts
     sharedMemory.write_mem(0xFFFF, 0x00); //IE register - interrupts
 
     timer_counter = 1024;
@@ -97,17 +97,53 @@ gb::gb()
 
 bool gb::any_interrupts() {
     //checks for and handles interrupts
-    if(!IME) return false;
+    if(!IME && !halt) return false;
     else{
-        uint8_t interrupts = sharedMemory.read_mem(0xFFFF) & sharedMemory.read_mem(0xFF0F);
+        uint8_t interrupts = sharedMemory.read_mem(0xFFFF) & sharedMemory.read_mem(0xFF0F) & 0x1F;
         if(interrupts != 0){
+#ifdef DEBUG
+            printf("Interrupt detected!\n");
+            printf("IF & IE = %X\n", (interrupts));
+#endif
             IME = false; //disable further interrupts
+            if (halt)
+                halt = false;
             uint16_t address;
-            if(isbiton(0, interrupts)) address = 0x0040; //Vblank
-            else if(isbiton(1, interrupts)) address = 0x0048; //LCD STAT
-            else if(isbiton(2, interrupts)) address = 0x0050; //Timer
-            else if(isbiton(3, interrupts)) address = 0x0058; //Serial
-            else if(isbiton(4, interrupts)) address = 0x0060; //Joypad
+            if(isbiton(0, interrupts)) {
+                address = 0x0040; //Vblank
+                sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F) & 0xFE));
+#ifdef DEBUG
+                printf("Interrupt 0 - Vertical Blank\n");
+#endif
+            }
+            else if(isbiton(1, interrupts)) {
+                address = 0x0048; //LCD STAT
+                sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F) & 0xFD));
+#ifdef DEBUG
+                printf("Interrupt 1 - LCD STAT\n");
+#endif
+            }
+            else if(isbiton(2, interrupts)) {
+                address = 0x0050; //Timer
+                sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F) & 0xFB));
+#ifdef DEBUG
+                printf("Interrupt 2 - Timer\n");
+#endif
+            }
+            else if(isbiton(3, interrupts)) {
+                address = 0x0058; //Serial
+                sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F) & 0xF7));
+#ifdef DEBUG
+                printf("Interrupt 3 - Serial\n");
+#endif
+            }
+            else if(isbiton(4, interrupts)) {
+                address = 0x0060; //Joypad
+                sharedMemory.write_mem(0xFF0F, (sharedMemory.read_mem(0xFF0F) & 0xEF));
+#ifdef DEBUG
+                printf("Interrupt 4 - Joypad\n");
+#endif
+            }
             // jump to interrupt handler
             SP--;
             write_mem(SP--, (PC >> 8));
@@ -129,14 +165,19 @@ void gb::request_interrupt(uint8_t irq_num) {
 void gb::CPU_execute_op() {
     cyclecount = 0;
     //TODO: ensure interrupt handler works
-    if(!any_interrupts()) {
+    if(halt)
+    {
+        cyclecount += 1;
+        if((sharedMemory.read_mem(0xFF0F) & sharedMemory.read_mem(0xFFFF) & 0x1F) != 0)
+            halt = false;
+    }
+    else if(!any_interrupts()) {
         //fetch instruction
         opcode = sharedMemory.read_mem(PC);
         //output for debug
 #ifdef DEBUG
         std::printf("pc:  %x\topcode:  %x\t\t", PC, opcode);
-        while(PC == 0xCB44);
-        //opscompleted++;
+        //while (opcode == 0xDA);
 #endif
         //increment pc before doing anything
         PC++;
@@ -425,8 +466,8 @@ void gb::OP_HALT() {
     printf("HALT\n");
 #endif
     //HALT: power down CPU until an interrupt
-    if ((sharedMemory.read_mem(0xFF0F) & sharedMemory.read_mem(0xFFFF)) == 0)
-        PC--;
+    halt = true;
+    cyclecount += 1;
 }
 
 void gb::OP_STOP() {
@@ -473,8 +514,8 @@ void gb::OP_RST(uint8_t xxx) {
 #endif
     //push PC onto stack
     SP--;
-    sharedMemory.write_mem(SP--, (PC >> 8)); //MSB
-    sharedMemory.write_mem(SP, (PC & 0xFF)); //LSB
+    write_mem(SP--, (PC >> 8)); //MSB
+    write_mem(SP, (PC & 0xFF)); //LSB
     PC = reset;
     cyclecount += 8;
     //cycle_delay(8);
@@ -498,7 +539,7 @@ void gb::OP_LD(uint8_t xxx, uint8_t yyy) {
         *destination = val;
     }
     else {
-        sharedMemory.write_mem(HL(), val);
+        write_mem(HL(), val);
         delay = 2;
     }
 #ifdef DEBUG
@@ -519,7 +560,7 @@ void gb::OP_LD_imm(uint8_t xxx) {
         *destination = imm;
     }
     else {
-        sharedMemory.write_mem(HL(), imm);
+        write_mem(HL(), imm);
         delay = 3;
     }
 #ifdef DEBUG
@@ -574,26 +615,26 @@ void gb::OP_LD_mem(uint8_t xxx) {
         //load from A to mem
         switch (xxx) {
             case 0:
-                sharedMemory.write_mem(BC(), A);
+                write_mem(BC(), A);
 #ifdef DEBUG
                 printf("LD (BC), A\n");
 #endif
                 break;
             case 2:
-                sharedMemory.write_mem(DE(), A);
+                write_mem(DE(), A);
 #ifdef DEBUG
                 printf("LD (DE), A\n");
 #endif
                 break;
             case 4:
-                sharedMemory.write_mem(HL(), A);
+                write_mem(HL(), A);
 #ifdef DEBUG
                 printf("LD (HL+), A\n");
 #endif
                 increment = true;
                 break;
             case 6:
-                sharedMemory.write_mem(HL(), A);
+                write_mem(HL(), A);
 #ifdef DEBUG
                 printf("LD (HL-), A\n");
 #endif
@@ -705,7 +746,7 @@ void gb::OP_INC_r(uint8_t xxx) {
         val = sharedMemory.read_mem(HL());
         temp = val;
         val++;
-        sharedMemory.write_mem(HL(), val);
+        write_mem(HL(), val);
         set_Z(val == 0);
     }
     else {
@@ -733,7 +774,7 @@ void gb::OP_DEC_r(uint8_t xxx) {
         val = sharedMemory.read_mem(HL());
         temp = val;
         val--;
-        sharedMemory.write_mem(HL(), val);
+        write_mem(HL(), val);
         set_Z(val == 0);
     }
     else {
@@ -899,7 +940,7 @@ void gb::OP_SCF() {
     set_H(false);
     set_N(false);
 #ifdef DEBUG
-    printf("SCF r\n");
+    printf("SCF\n");
 #endif
     cyclecount += 1;
     //cycle_delay(1);
@@ -1905,20 +1946,6 @@ void gb::CB_RES(uint8_t bbb, uint8_t xxx) {
     //cycle_delay(delay);
 }
 
-void gb::write_mem(uint16_t address, uint8_t value) {
-#ifdef DEBUG
-    //printf("write_mem. A: 0x%X D: 0x%X\n",address, value);
-#endif
-    if (address == 0xFF07)
-    {
-        //update timer controller!
-        sharedMemory.write_mem(address, value);
-        set_clock_freq();
-    }
-    else
-        sharedMemory.write_mem(address, value);
-}
-
 uint8_t *gb::decode_register(uint8_t xxx) {
     switch (xxx)
     {
@@ -1963,16 +1990,6 @@ uint8_t *gb::decode_register(uint8_t xxx) {
             return nullptr;
     }
 }
-
-/*void gb::cycle_delay(uint8_t cycles) {
-    cycles_ran += cycles;
-    if (cycles_ran >= 4194) //approximately the number of cycles in 1 ms (4194.304)
-    {
-        //clock.restart();
-        cycles_ran = 0;
-        //while(clock.getElapsedTime().asMilliseconds() < 1); //yep, just NOP
-    }
-}*/
 
 uint16_t gb::HL() const {
     return (H << 8) + L;
@@ -2062,11 +2079,28 @@ bool gb::test_condition(uint8_t cc) const {
     return test;
 }
 
+void gb::write_mem(uint16_t address, uint8_t value) {
+#ifdef DEBUG
+    //printf("write_mem. A: 0x%X D: 0x%X\n",address, value);
+#endif
+    if (address == 0xFF07)
+    {
+        //update timer controller!
+        uint8_t currentfreq = sharedMemory.read_mem(0xFF07) & 0x3;
+
+        sharedMemory.write_mem(address, value);
+
+        if (currentfreq != (value & 0x3))
+            set_clock_freq();
+    }
+    else
+        sharedMemory.write_mem(address, value);
+}
 
 void gb::update_timers(uint32_t cycles) {
-    handle_div_reg(cycles*4);
+    handle_div_reg(cycles);
     if(isclockenabled()){
-        timer_counter -= (cycles * 4);
+        timer_counter -= cycles;
 
         // have enough cpu cycles happened to update timer?
         if (timer_counter <= 0)
@@ -2078,7 +2112,7 @@ void gb::update_timers(uint32_t cycles) {
             if(sharedMemory.read_mem(0xFF05) == 255)
             {
                 write_mem(0xFF05, sharedMemory.read_mem(0xFF06));
-                request_interrupt(2);
+                sharedMemory.request_interrupt(2);
             }
             else
             {
@@ -2106,9 +2140,10 @@ void gb::set_clock_freq() {
     uint8_t freq = sharedMemory.read_mem(0xFF07) & 0x03;
     switch (freq)
     {
-        case 0: timer_counter = 1024;
-        case 1: timer_counter = 16;
-        case 2: timer_counter = 64;
-        case 3: timer_counter = 256;
+        case 0: timer_counter = 1024; break;
+        case 1: timer_counter = 16; break;
+        case 2: timer_counter = 64; break;
+        case 3: timer_counter = 256; break;
+        default: break;
     }
 }

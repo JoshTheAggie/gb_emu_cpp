@@ -92,7 +92,6 @@ uint8_t memory::read_mem(uint16_t address) const {
         }
         else //if((system_mem[0xFF00] & 0x10) == 0)
         {
-            //todo: ensure the above commenting out works
             //we operate under the assumption that exactly one or the other is 0
             //direction buttons selected
             return ((system_mem[0xFF00] & 0xF0) | (directions & 0x0F));
@@ -110,8 +109,12 @@ uint8_t memory::read_mem(uint16_t address) const {
     else if (address >= 0xA000 && address < 0xC000)
     {
         //reading from RAM bank
-        uint16_t newaddress = address - 0xA000;
-        return rambanks[newaddress + (currentRAMbank * 0x2000)];
+        if(enableRAM) {
+            uint16_t newaddress = address - 0xA000;
+            return rambanks[newaddress + (currentRAMbank * 0x2000)];
+        }
+        else
+            return 0xFF; //rambanks[address-0xA000];
     }
     else
         return system_mem[address];
@@ -172,12 +175,15 @@ void memory::LoadROM(const char *filename) {
         case 2:
         case 3:
             mbc_type = MBC1;
+            std::cout << "MBC1 detected\n";
             break;
         case 5:
         case 6:
             mbc_type = MBC2;
+            std::cout << "MBC2 detected\n";
             break;
         default:
+            std::cout << "No MBC detected\n";
             break;
 
     }
@@ -230,7 +236,9 @@ void memory::rambankenable(uint16_t address, uint8_t data) {
     }
 
     if ((data & 0xF) == 0xA) enableRAM = true;
-    else if ((data & 0xF) == 0x0) enableRAM = false;
+    else {
+        enableRAM = false;
+    }
 }
 
 void memory::changeLorombank(uint8_t data) {
@@ -243,6 +251,9 @@ void memory::changeLorombank(uint8_t data) {
     currentROMbank &= 0xE0; //turn off the lower 5 bits
     currentROMbank |= (data & 0x1F); //superimpose lower 5 from data
     if (currentROMbank == 0) currentROMbank++;
+    if (mbc_type == MBC1)
+        if (data == 0x20 || data == 0x40 || data == 0x60)
+            currentROMbank = data + 1; //MBC1 bug
 }
 
 void memory::changeHirombank(uint8_t data) {
@@ -251,6 +262,9 @@ void memory::changeHirombank(uint8_t data) {
     data &= 0xE0; //turn off lower 5 bits of data
     currentROMbank |= data;
     if (currentROMbank == 0) currentROMbank++;
+    if (mbc_type == MBC1)
+        if (data == 0x20 || data == 0x40 || data == 0x60)
+            currentROMbank = data + 1; //MBC1 bug
 }
 
 void memory::rambankchange(uint8_t data) {
@@ -261,4 +275,8 @@ void memory::changeromrammode(uint8_t data) {
     rombanking = ((data & 0x1) == 0);
     if (rombanking) currentRAMbank = 0;
     //GB can only access RAM bank 0 while ROM banking
+}
+
+void memory::request_interrupt(uint8_t irq_num) {
+    system_mem[0xFF0F] |= (0x1 << irq_num);
 }

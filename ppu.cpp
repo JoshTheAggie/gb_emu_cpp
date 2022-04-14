@@ -20,7 +20,6 @@ void ppu::update_graphics(int32_t cycles) {
     if(scanline_counter <= 0)
     {
         //time to move to next scanline
-        sharedMemory.incrementLY();
         uint8_t currentline = LY;
 
         scanline_counter = 456; //456 CPU cycles per scanline
@@ -35,8 +34,13 @@ void ppu::update_graphics(int32_t cycles) {
         {
             sharedMemory.write_mem(0xFF44, 0x00);
         }
-        else if (currentline < 144)
+        else if (currentline < 144) {
             draw_scanline();
+        }
+
+        if (currentline <= 153)
+            sharedMemory.incrementLY();
+
     }
 }
 
@@ -50,7 +54,6 @@ void ppu::draw_scanline() {
     {
         render_sprites();
     }
-    //sharedMemory.write_mem(0xFF44, (sharedMemory.read_mem(0xFF44)+1));
 }
 
 void ppu::setLCDstatus() {
@@ -260,7 +263,7 @@ void ppu::render_tiles() {
             continue;
 
         //finally write the pixel!
-        uint32_t pixeldata = (red << 24) + (green << 16) + (blue << 8) + 0xFF; //RGBA for SFML
+        uint32_t pixeldata = 0xFF000000 + (blue << 16) + (green << 8) + red; //RGBA for SFML
         display[finalY * 160 + pixel] = pixeldata;
     }
 }
@@ -295,7 +298,7 @@ void ppu::render_sprites() {
                 line = -1 * (line - ysize);
             }
 
-            line = line * 2; //double line num same as background tiles
+            line *= 2; //double line num same as background tiles
             //each line of the tile is 2 bytes
             uint16_t data_address = 0x8000 + (tile_location * 16) + line;
             uint8_t data1 = sharedMemory.read_mem(data_address);
@@ -317,9 +320,8 @@ void ppu::render_sprites() {
                 //which palette?
                 uint16_t coloraddress = testbit(4, attributes)? 0xFF49 : 0xFF48;
                 COLOR col = get_color(colornum, coloraddress);
-                //white is transparent for tiles
-                if(col == WHITE) continue;
-
+                //if (col == WHITE) continue;
+                if (colornum == 0x00) continue;
                 int red = 0, green = 0, blue = 0;
 
                 switch(col)
@@ -345,7 +347,7 @@ void ppu::render_sprites() {
                 if ((scanline<0)||(scanline>143)||(pixel<0)||(pixel>159)) continue;
 
                 //render the pixel to display
-                uint32_t pixeldata = (red << 24) + (green << 16) + (blue << 8) + 0xFF; //RGBA for SFML
+                uint32_t pixeldata = 0xFF000000 + (blue << 16) + (green << 8) + red; //RGBA for SFML
                 display[scanline * 160 + pixel] = pixeldata;
             }
         }

@@ -166,6 +166,7 @@ void memory::LoadROM(const char *filename) {
     else
     {
         std::cerr << "Cannot open ROM file!\n";
+        std::exit(EXIT_FAILURE);
     }
 
     //detect ROM banking

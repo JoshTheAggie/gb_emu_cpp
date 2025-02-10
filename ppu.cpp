@@ -45,12 +45,11 @@ void ppu::update_graphics(int32_t cycles) {
 }
 
 void ppu::draw_scanline() {
-    uint8_t control = sharedMemory.read_mem(0xFF40);
-    if(testbit(0, control)) // is bit 0 on?
+    if(bg_enable()) // is bit 0 on?
     {
         render_tiles();
     }
-    if(testbit(1, control)) // is bit 1 on?
+    if(obj_enable()) // is bit 1 on?
     {
         render_sprites();
     }
@@ -219,6 +218,9 @@ void ppu::render_tiles() {
         uint16_t tileAddress = backgroundMemory + tileRow + tileCol;
         if(unsig) tileNum = (uint8_t)sharedMemory.read_mem(tileAddress);
         else tileNum = (int8_t)sharedMemory.read_mem(tileAddress);
+	//TODO: find out what I was thinking, in the line above and the two lines below
+        //else tileNum = ((sharedMemory.read_mem(tileAddress) & 0x80) == 0) ?
+                //sharedMemory.read_mem(tileAddress) : ((short)0xFF00 | sharedMemory.read_mem(tileAddress));
 
         //where's this tile ID in memory?
         uint16_t tileLocation = tileData;
@@ -271,6 +273,7 @@ void ppu::render_tiles() {
 void ppu::render_sprites() {
     bool use8x16 = obj_size();
     int scanline = LY;
+    int obj_count = 0;
 
     //loop through all 40 sprites in OAM
     for (int sprite = 0; sprite < 40; sprite++)
@@ -280,9 +283,13 @@ void ppu::render_sprites() {
         uint8_t ypos = sharedMemory.read_mem(0xFE00 + index) - 16;
         int ysize = (use8x16) ? 16 : 8;
 
+        //TODO: bg over obj bit set? double check this
+        bool drawoverbg = ((sharedMemory.read_mem(0xFE00 + index + 3) & 0x80) == 0) || ~bg_enable();
+
         //does the sprite appear in this scanline?
         if((scanline >= ypos) && (scanline < (ypos + ysize)))
         {
+            obj_count++;
             //moved all these here to avoid unneeded memory accesses
             uint8_t xpos = sharedMemory.read_mem(0xFE00 + index + 1) - 8;
             uint8_t tile_location = sharedMemory.read_mem(0xFE00 + index + 2);
@@ -351,6 +358,7 @@ void ppu::render_sprites() {
                 display[scanline * 160 + pixel] = pixeldata;
             }
         }
+        if (obj_count >= 10) break; //stop drawing sprites after 10
     }
 }
 

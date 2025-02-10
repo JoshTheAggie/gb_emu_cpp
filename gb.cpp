@@ -97,6 +97,7 @@ gb::gb()
 
 bool gb::any_interrupts() {
     //checks for and handles interrupts
+    if(CB_instruction) return false; //don't interrupt midway through CB instructions
     if(!IME && !halt) return false;
     else{
         uint8_t interrupts = sharedMemory.read_mem(0xFFFF) & sharedMemory.read_mem(0xFF0F) & 0x1F;

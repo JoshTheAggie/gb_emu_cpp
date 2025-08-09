@@ -48,13 +48,14 @@ void memory::write_mem(uint16_t address, uint8_t value) {
                 rambanks[newaddress + ((currentRAMbank_rombank_hi2 & (number_of_ram_banks-1)) * 0x2000)] = value;
             else if (mbc_type == MBC2) {
                 //only the bottom 9 bits are used here
+                //only the bottom 4 bits in each byte exist in hardware
                 rambanks[newaddress & 0x1FF] = value;
             }
             else
                 rambanks[newaddress] = value;
         }
     }
-        // writes to ECHO RAM writes to RAM as well
+        // writes to ECHO RAM writes to internal work RAM as well
     else if ((address >= 0xE000) && (address < 0xFE00))
     {
         system_mem[address] = value;
@@ -126,20 +127,20 @@ uint8_t memory::read_mem(uint16_t address) const {
             return cartridge_rom[newaddress + bankNumber * 0x4000];
         }
         else if (mbc_type == MBC2)
-            return cartridge_rom[newaddress + currentROMbank_lo5 * 0x4000];
+            return cartridge_rom[newaddress + (currentROMbank_lo5 & (number_of_rom_banks-1)) * 0x4000];
         else
             return cartridge_rom[newaddress];
     }
     else if (address >= 0xA000 && address < 0xC000)
     {
         //reading from RAM bank
-        // currently passing the 32KB ram test, failing the 8KB (one bank) test.
         if(enableRAM) {
             uint16_t newaddress = address - 0xA000;
             if (mbc_type == MBC1 && MBC1bankingmode1)
                 return rambanks[newaddress + ((currentRAMbank_rombank_hi2 & (number_of_ram_banks-1)) * 0x2000)];
             else if (mbc_type == MBC2)
-                return rambanks[newaddress & 0x1FF];
+                // MBC2 has internal RAM, only bottom 4 bits used, uppers are 1
+                return rambanks[newaddress & 0x1FF] | 0xF0;
             else
                 return rambanks[newaddress];
         }
@@ -281,10 +282,8 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     if (address < 0x2000)
     {
         if(mbc_type == MBC1)
-        {
             ramenable(value);
-        }
-        if (mbc_type == MBC2)
+        else if (mbc_type == MBC2)
             MBC2_ramenable_rombankswitch(address, value);
     }
 
@@ -293,7 +292,7 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     {
         if (mbc_type == MBC1)
             changeLorombank(value);
-        if (mbc_type == MBC2)
+        else if (mbc_type == MBC2)
             MBC2_ramenable_rombankswitch(address, value);
     }
 

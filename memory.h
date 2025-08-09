@@ -20,14 +20,16 @@ class memory {
     uint8_t cartridge_rom [0x200000]{}; //cartridge rom
     //rom banking
     MBC mbc_type = NONE;
-    uint8_t currentROMbank = 1;
+    uint8_t currentROMbank_lo5 = 1;
+    uint16_t number_of_rom_banks = 2;
     //ram banks
     uint8_t rambanks [0x8000]{};
-    uint8_t currentRAMbank = 0;
+    uint8_t currentRAMbank_rombank_hi2 = 0;
+    uint16_t number_of_ram_banks = 0;
     void handlebanking(uint16_t address, uint8_t value);
     bool enableRAM = false;
-    bool rombanking = true;
-    void rambankenable(uint16_t address, uint8_t data);
+    bool MBC1bankingmode1 = false;
+    void ramenable(uint16_t address, uint8_t data);
     void changeLorombank(uint8_t data);
     void changeHirombank(uint8_t data);
     void rambankchange(uint8_t data);

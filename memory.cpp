@@ -45,11 +45,19 @@ void memory::write_mem(uint16_t address, uint8_t value) {
         {
             uint16_t newaddress = address - 0xA000;
             if (mbc_type == MBC1 && MBC1bankingmode1)
-                rambanks[newaddress + ((currentRAMbank_rombank_hi2 & (number_of_ram_banks-1)) * 0x2000)] = value;
+                rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)] = value;
             else if (mbc_type == MBC2) {
                 //only the bottom 9 bits are used here
                 //only the bottom 4 bits in each byte exist in hardware
                 rambanks[newaddress & 0x1FF] = value;
+            }
+            else if (mbc_type == MBC3) {
+                //RTC or 8KiB RAM bank
+                if (MBC3mapRTC)
+                    MBC3_RTC[MBC3_current_RTC_reg] = value;
+                else
+                    //RAM bank
+                    rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)] = value;
             }
             else
                 rambanks[newaddress] = value;
@@ -112,22 +120,22 @@ uint8_t memory::read_mem(uint16_t address) const {
     else if (address < 0x4000) {
         //ROM banking only in MBC1 mode 1
         if (mbc_type == MBC1 && MBC1bankingmode1) {
-            uint8_t bankNumber = (currentRAMbank_rombank_hi2 << 5) & (number_of_rom_banks-1);
+            uint8_t bankNumber = (currentRAMbank_rombank_hi << 5) & (number_of_rom_banks-1);
             return cartridge_rom[address + (bankNumber * 0x4000)];
         }
-        else //MBC2 never banks in this region
+        else //MBC2, MBC3, MBC5 never bank in this region
             return cartridge_rom[address];
     }
     else if (address >= 0x4000 && address < 0x8000) {
         //reading from ROM bank
         uint16_t newaddress = address - 0x4000;
         if (mbc_type == MBC1) {
-            uint8_t bankNumber = ((currentRAMbank_rombank_hi2 << 5) | currentROMbank_lo5)
+            uint8_t bankNumber = ((currentRAMbank_rombank_hi << 5) | currentROMbank_lo)
                                  & (number_of_rom_banks-1);
             return cartridge_rom[newaddress + bankNumber * 0x4000];
         }
-        else if (mbc_type == MBC2)
-            return cartridge_rom[newaddress + (currentROMbank_lo5 & (number_of_rom_banks-1)) * 0x4000];
+        else if (mbc_type == MBC2 || mbc_type == MBC3)
+            return cartridge_rom[newaddress + (currentROMbank_lo & (number_of_rom_banks-1)) * 0x4000];
         else
             return cartridge_rom[newaddress];
     }
@@ -137,10 +145,17 @@ uint8_t memory::read_mem(uint16_t address) const {
         if(enableRAM) {
             uint16_t newaddress = address - 0xA000;
             if (mbc_type == MBC1 && MBC1bankingmode1)
-                return rambanks[newaddress + ((currentRAMbank_rombank_hi2 & (number_of_ram_banks-1)) * 0x2000)];
+                return rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)];
             else if (mbc_type == MBC2)
                 // MBC2 has internal RAM, only bottom 4 bits used, uppers are 1
                 return rambanks[newaddress & 0x1FF] | 0xF0;
+            else if (mbc_type == MBC3) {
+                // MBC3 has both an 8KiB RAM bank or RTC registers
+                if (MBC3mapRTC)
+                    return MBC3_RTC[MBC3_current_RTC_reg];
+                else
+                    return rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)];
+            }
             else
                 return rambanks[newaddress];
         }
@@ -217,22 +232,28 @@ void memory::LoadROM(const char *filename) {
             mbc_type = MBC2;
             std::cout << "MBC2 detected\n";
             break;
-        case 0x08: // ROM + RAM              No licensed cart uses 8 or 9
-        case 0x09: // ROM + RAM + Battery    No licensed cart uses 8 or 9
-        case 0x0B: // MMM01
-        case 0x0C: // MMM01 + RAM
-        case 0x0D: // MMM01 + RAM + Battery
         case 0x0F: // MBC3 + TIMER + Battery
         case 0x10: // MBC3 + TIMER + RAM + Battery
         case 0x11: // MBC3
         case 0x12: // MBC3 + RAM
         case 0x13: // MBC3 + RAM + Battery
+            mbc_type = MBC3;
+            std::cout << "MBC3 detected\n";
+            break;
         case 0x19: // MBC5
         case 0x1A: // MBC5 + RAM
         case 0x1B: // MBC5 + RAM + Battery
         case 0x1C: // MBC5 + RUMBLE
         case 0x1D: // MBC5 + RUMBLE + RAM
         case 0x1E: // MBC5 + RUMBLE + RAM + Battery
+            mbc_type = MBC5;
+            std::cout << "MBC5 detected\n";
+            break;
+        case 0x08: // ROM + RAM              No licensed cart uses 8 or 9
+        case 0x09: // ROM + RAM + Battery    No licensed cart uses 8 or 9
+        case 0x0B: // MMM01
+        case 0x0C: // MMM01 + RAM
+        case 0x0D: // MMM01 + RAM + Battery
         case 0x20: // MBC6
         case 0x22: // MBC7 + SENSOR + RUMBLE + RAM + Battery
         case 0xFC: // POCKET CAMERA
@@ -281,7 +302,7 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     //do RAM enable
     if (address < 0x2000)
     {
-        if(mbc_type == MBC1)
+        if(mbc_type == MBC1 || mbc_type == MBC3)
             ramenable(value);
         else if (mbc_type == MBC2)
             MBC2_ramenable_rombankswitch(address, value);
@@ -290,7 +311,7 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     //do ROM bank change
     else if (address >= 0x2000 && address < 0x4000)
     {
-        if (mbc_type == MBC1)
+        if (mbc_type == MBC1 || mbc_type == MBC3)
             changeLorombank(value);
         else if (mbc_type == MBC2)
             MBC2_ramenable_rombankswitch(address, value);
@@ -299,9 +320,11 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     //do ROM or RAM bank change
     else if (address >= 0x4000 && address < 0x6000)
     {
-        if (mbc_type == MBC1)
-        {
+        if (mbc_type == MBC1) {
             rambankchange(value);
+        }
+        else if (mbc_type == MBC3) {
+            MBC3_RTC_RAM_select(value);
         }
     }
 
@@ -310,6 +333,12 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     {
         if (mbc_type == MBC1)
             changeromrammode(value);
+        else if (mbc_type == MBC3) {
+            if (MBC3_RTC_latch)
+                MBC3_latch_time();
+            else
+                MBC3_RTC_latch = true;
+        }
     }
 }
 
@@ -319,8 +348,9 @@ void memory::ramenable(uint8_t data) {
 }
 
 void memory::changeLorombank(uint8_t data) {
-    currentROMbank_lo5 = (data & 0x1F);
-    if (currentROMbank_lo5 == 0x00) currentROMbank_lo5 = 1;
+    if (mbc_type == MBC1) currentROMbank_lo = (data & 0x1F);
+    else if (mbc_type == MBC3) currentROMbank_lo = (data & 0x7F);
+    if (currentROMbank_lo == 0x00) currentROMbank_lo = 1;
 
     // truncate bits for currentTROMbank larger than
     // the number of actual rom banks
@@ -334,35 +364,54 @@ void memory::MBC2_ramenable_rombankswitch(uint16_t address, uint8_t data) {
         ramenable(data);
     else {
         //select ROM bank
-        currentROMbank_lo5 = data & 0xF;
-        if (currentROMbank_lo5 == 0) currentROMbank_lo5 = 1;
+        currentROMbank_lo = data & 0xF;
+        if (currentROMbank_lo == 0) currentROMbank_lo = 1;
     }
+}
+
+void memory::MBC3_RTC_RAM_select(uint8_t value) {
+    if (value < 0x08) {
+        currentRAMbank_rombank_hi = value;
+        MBC3mapRTC = false;
+    }
+    else {
+        MBC3_current_RTC_reg = value;
+        MBC3mapRTC = true;
+    }
+}
+
+void memory::MBC3_latch_time() {
+    //TODO: this
+    // Basically this latches the current time from the RTC chip to the registers
+    // see: https://gbdev.io/pandocs/MBC3.html#6000-7fff---latch-clock-data-write-only
+    std::cout << "RTC time latch function unimplemented!\n";
+    MBC3_RTC_latch = false;
 }
 
 void memory::changeHirombank(uint8_t data) {
     //Note: this isn't needed anymore since I'm only using the RAMbank number now
     // and concatenating when needed
     //change upper ROM bank number bits in MBC1 mode
-    currentROMbank_lo5 &= 0x1F; //turn off upper 3 bits
+    currentROMbank_lo &= 0x1F; //turn off upper 3 bits
     data &= 0xE0; //turn off lower 5 bits of data
-    currentROMbank_lo5 |= data;
-    if (currentROMbank_lo5 == 0) currentROMbank_lo5 = 1;
+    currentROMbank_lo |= data;
+    if (currentROMbank_lo == 0) currentROMbank_lo = 1;
     if (mbc_type == MBC1)
-        if (currentROMbank_lo5 == 0x0)
-            currentROMbank_lo5 = data + 1; //MBC1 bug
+        if (currentROMbank_lo == 0x0)
+            currentROMbank_lo = data + 1; //MBC1 bug
     // truncate bits for larger currentTROMbank larger than
     // the number of actual rom banks
     if (mbc_type == MBC1)
-        if (currentROMbank_lo5 > number_of_rom_banks)
-            currentROMbank_lo5 = currentROMbank_lo5 & (number_of_rom_banks - 1);
+        if (currentROMbank_lo > number_of_rom_banks)
+            currentROMbank_lo = currentROMbank_lo & (number_of_rom_banks - 1);
 }
 
 void memory::rambankchange(uint8_t data) {
 
-    currentRAMbank_rombank_hi2 = data & 0x3;
+    currentRAMbank_rombank_hi = data & 0x3;
     if (mbc_type == MBC1)
-        if (currentROMbank_lo5 == 0x00)
-            currentROMbank_lo5 = 1; //MBC1 bug
+        if (currentROMbank_lo == 0x00)
+            currentROMbank_lo = 1; //MBC1 bug
 }
 
 void memory::changeromrammode(uint8_t data) {

@@ -12,7 +12,7 @@ typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 
-enum MBC {NONE, MBC1, MBC2};
+enum MBC {NONE, MBC1, MBC2, MBC3, MBC5, MBC6, MBC7, MMM01, M161, HuC1, HuC3};
 
 class memory {
     uint8_t system_mem [0x10000]{};    //64KiB of memory
@@ -20,18 +20,25 @@ class memory {
     uint8_t cartridge_rom [0x200000]{}; //cartridge rom
     //rom banking
     MBC mbc_type = NONE;
-    uint8_t currentROMbank_lo5 = 1;
+    uint8_t currentROMbank_lo = 1;
     uint16_t number_of_rom_banks = 2;
     //ram banks
     uint8_t rambanks [0x8000]{};
-    uint8_t currentRAMbank_rombank_hi2 = 0;
-    uint16_t number_of_ram_banks = 0;
-    void handlebanking(uint16_t address, uint8_t value);
+    uint8_t currentRAMbank_rombank_hi = 0;
+    uint16_t number_of_ram_banks = 0;;
     bool enableRAM = false;
     bool MBC1bankingmode1 = false;
+    // MB3 stuff
+    bool MBC3mapRTC = false;
+    uint8_t MBC3_RTC [0xF]{};
+    uint8_t MBC3_current_RTC_reg = 8;
+    bool MBC3_RTC_latch = false;
+    void handlebanking(uint16_t address, uint8_t value);
     void ramenable(uint8_t data);
     void changeLorombank(uint8_t data);
     void MBC2_ramenable_rombankswitch(uint16_t address, uint8_t data);
+    void MBC3_RTC_RAM_select(uint8_t value);
+    void MBC3_latch_time();
     void changeHirombank(uint8_t data);
     void rambankchange(uint8_t data);
     void changeromrammode(uint8_t data);

@@ -33,8 +33,7 @@ memory::memory() {
 }
 
 void memory::write_mem(uint16_t address, uint8_t value) {
-//todo: implement rom banking, any other indirection, etc.
-    //don't allow writes to read-only memory
+    // Writes to ROM only allowed for MBCs
     if (address < 0x8000)
     {
         handlebanking(address, value);
@@ -146,7 +145,8 @@ uint8_t memory::read_mem(uint16_t address) const {
             return cartridge_rom[newaddress + (bankNumber * 0x4000)];
         }
         else
-            return cartridge_rom[newaddress];
+            // No banking = no address shift needed
+            return cartridge_rom[address];
     }
     else if (address >= 0xA000 && address < 0xC000)
     {
@@ -230,6 +230,7 @@ void memory::LoadROM(const char *filename) {
     switch (system_mem[0x147])
     {
         case 0x00: // ROM only/No MBC
+            mbc_type = NONE;
             std::cout << "No MBC detected\n";
             break;
         case 0x01: // MBC1

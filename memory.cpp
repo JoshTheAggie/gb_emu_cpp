@@ -46,6 +46,10 @@ void memory::write_mem(uint16_t address, uint8_t value) {
             uint16_t newaddress = address - 0xA000;
             if (mbc_type == MBC1 && MBC1bankingmode1)
                 rambanks[newaddress + ((currentRAMbank_rombank_hi2 & (number_of_ram_banks-1)) * 0x2000)] = value;
+            else if (mbc_type == MBC2) {
+                //only the bottom 9 bits are used here
+                rambanks[newaddress & 0x1FF] = value;
+            }
             else
                 rambanks[newaddress] = value;
         }
@@ -110,19 +114,19 @@ uint8_t memory::read_mem(uint16_t address) const {
             uint8_t bankNumber = (currentRAMbank_rombank_hi2 << 5) & (number_of_rom_banks-1);
             return cartridge_rom[address + (bankNumber * 0x4000)];
         }
-        else
+        else //MBC2 never banks in this region
             return cartridge_rom[address];
     }
     else if (address >= 0x4000 && address < 0x8000) {
         //reading from ROM bank
         uint16_t newaddress = address - 0x4000;
-        if (mbc_type == MBC1) { // && MBC1bankingmode1)
-            //return cartridge_rom[newaddress + ((currentROMbank_lo5 & (number_of_rom_banks - 1)) * 0x4000)];
-        //else {
+        if (mbc_type == MBC1) {
             uint8_t bankNumber = ((currentRAMbank_rombank_hi2 << 5) | currentROMbank_lo5)
                                  & (number_of_rom_banks-1);
             return cartridge_rom[newaddress + bankNumber * 0x4000];
         }
+        else if (mbc_type == MBC2)
+            return cartridge_rom[newaddress + currentROMbank_lo5 * 0x4000];
         else
             return cartridge_rom[newaddress];
     }
@@ -134,6 +138,8 @@ uint8_t memory::read_mem(uint16_t address) const {
             uint16_t newaddress = address - 0xA000;
             if (mbc_type == MBC1 && MBC1bankingmode1)
                 return rambanks[newaddress + ((currentRAMbank_rombank_hi2 & (number_of_ram_banks-1)) * 0x2000)];
+            else if (mbc_type == MBC2)
+                return rambanks[newaddress & 0x1FF];
             else
                 return rambanks[newaddress];
         }
@@ -274,17 +280,21 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     //do RAM enable
     if (address < 0x2000)
     {
-        if(mbc_type == MBC1 || mbc_type == MBC2)
+        if(mbc_type == MBC1)
         {
-            ramenable(address, value);
+            ramenable(value);
         }
+        if (mbc_type == MBC2)
+            MBC2_ramenable_rombankswitch(address, value);
     }
 
     //do ROM bank change
     else if (address >= 0x2000 && address < 0x4000)
     {
-        if (mbc_type == MBC1 || mbc_type == MBC2)
+        if (mbc_type == MBC1)
             changeLorombank(value);
+        if (mbc_type == MBC2)
+            MBC2_ramenable_rombankswitch(address, value);
     }
 
     //do ROM or RAM bank change
@@ -304,26 +314,12 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     }
 }
 
-void memory::ramenable(uint16_t address, uint8_t data) {
-    if(mbc_type == MBC2)
-    {
-        if ((address & 0x10) != 0) return;
-    }
-
+void memory::ramenable(uint8_t data) {
     if ((data & 0xF) == 0xA) enableRAM = true;
-    else {
-        enableRAM = false;
-    }
+    else enableRAM = false;
 }
 
 void memory::changeLorombank(uint8_t data) {
-    if (mbc_type == MBC2)
-    {
-        currentROMbank_lo5 = data & 0xF;
-        if (currentROMbank_lo5 == 0) currentROMbank_lo5++;
-        return;
-    }
-
     currentROMbank_lo5 = (data & 0x1F);
     if (currentROMbank_lo5 == 0x00) currentROMbank_lo5 = 1;
 
@@ -332,6 +328,16 @@ void memory::changeLorombank(uint8_t data) {
     //if (currentROMbank_lo5 > number_of_rom_banks)
     //    currentROMbank_lo5 = currentROMbank_lo5 & (number_of_rom_banks - 1);
     // this is checked on the fly
+}
+
+void memory::MBC2_ramenable_rombankswitch(uint16_t address, uint8_t data) {
+    if ((address & 0x0100) == 0) // ram enable
+        ramenable(data);
+    else {
+        //select ROM bank
+        currentROMbank_lo5 = data & 0xF;
+        if (currentROMbank_lo5 == 0) currentROMbank_lo5 = 1;
+    }
 }
 
 void memory::changeHirombank(uint8_t data) {

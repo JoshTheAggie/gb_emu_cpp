@@ -29,8 +29,9 @@ class memory {
     void handlebanking(uint16_t address, uint8_t value);
     bool enableRAM = false;
     bool MBC1bankingmode1 = false;
-    void ramenable(uint16_t address, uint8_t data);
+    void ramenable(uint8_t data);
     void changeLorombank(uint8_t data);
+    void MBC2_ramenable_rombankswitch(uint16_t address, uint8_t data);
     void changeHirombank(uint8_t data);
     void rambankchange(uint8_t data);
     void changeromrammode(uint8_t data);

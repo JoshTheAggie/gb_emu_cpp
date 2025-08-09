@@ -59,6 +59,10 @@ void memory::write_mem(uint16_t address, uint8_t value) {
                     //RAM bank
                     rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)] = value;
             }
+            else if (mbc_type == MBC5) {
+                // RAM banks 0-F
+                rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)] = value;
+            }
             else
                 rambanks[newaddress] = value;
         }
@@ -136,6 +140,11 @@ uint8_t memory::read_mem(uint16_t address) const {
         }
         else if (mbc_type == MBC2 || mbc_type == MBC3)
             return cartridge_rom[newaddress + (currentROMbank_lo & (number_of_rom_banks-1)) * 0x4000];
+        else if (mbc_type == MBC5) {
+            //Like MBC1 except 9 bits for banks
+            uint16_t bankNumber = MBC5_currentROMbank & (number_of_rom_banks-1);
+            return cartridge_rom[newaddress + (bankNumber * 0x4000)];
+        }
         else
             return cartridge_rom[newaddress];
     }
@@ -156,6 +165,8 @@ uint8_t memory::read_mem(uint16_t address) const {
                 else
                     return rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)];
             }
+            else if (mbc_type == MBC5)
+                return rambanks[newaddress + ((currentRAMbank_rombank_hi & (number_of_ram_banks-1)) * 0x2000)];
             else
                 return rambanks[newaddress];
         }
@@ -240,12 +251,13 @@ void memory::LoadROM(const char *filename) {
             mbc_type = MBC3;
             std::cout << "MBC3 detected\n";
             break;
-        case 0x19: // MBC5
-        case 0x1A: // MBC5 + RAM
-        case 0x1B: // MBC5 + RAM + Battery
+        case 0x1E: // MBC5 + RUMBLE + RAM + Battery
         case 0x1C: // MBC5 + RUMBLE
         case 0x1D: // MBC5 + RUMBLE + RAM
-        case 0x1E: // MBC5 + RUMBLE + RAM + Battery
+            hasRumble = true;
+        case 0x1B: // MBC5 + RAM + Battery
+        case 0x19: // MBC5
+        case 0x1A: // MBC5 + RAM
             mbc_type = MBC5;
             std::cout << "MBC5 detected\n";
             break;
@@ -292,6 +304,7 @@ void memory::LoadROM(const char *filename) {
         case 0x05: number_of_ram_banks = 8; break;
         default: number_of_ram_banks = 0; break;
     }
+    std::cout << "ROM banks: " << number_of_rom_banks << "\tRAM banks: " << number_of_ram_banks << std::endl;
 }
 
 void memory::incrementLY() {
@@ -302,7 +315,7 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
     //do RAM enable
     if (address < 0x2000)
     {
-        if(mbc_type == MBC1 || mbc_type == MBC3)
+        if(mbc_type == MBC1 || mbc_type == MBC3 || mbc_type == MBC5)
             ramenable(value);
         else if (mbc_type == MBC2)
             MBC2_ramenable_rombankswitch(address, value);
@@ -315,12 +328,16 @@ void memory::handlebanking(uint16_t address, uint8_t value) {
             changeLorombank(value);
         else if (mbc_type == MBC2)
             MBC2_ramenable_rombankswitch(address, value);
+        else if (mbc_type == MBC5) {
+            if (address < 0x3000) MBC5_change_ROMbank_lo(value);
+            else MBC5_change_ROMbank_hi(value);
+        }
     }
 
     //do ROM or RAM bank change
     else if (address >= 0x4000 && address < 0x6000)
     {
-        if (mbc_type == MBC1) {
+        if (mbc_type == MBC1 || mbc_type == MBC5) {
             rambankchange(value);
         }
         else if (mbc_type == MBC3) {
@@ -350,13 +367,8 @@ void memory::ramenable(uint8_t data) {
 void memory::changeLorombank(uint8_t data) {
     if (mbc_type == MBC1) currentROMbank_lo = (data & 0x1F);
     else if (mbc_type == MBC3) currentROMbank_lo = (data & 0x7F);
+    // happens to both MBC1 and MBC3
     if (currentROMbank_lo == 0x00) currentROMbank_lo = 1;
-
-    // truncate bits for currentTROMbank larger than
-    // the number of actual rom banks
-    //if (currentROMbank_lo5 > number_of_rom_banks)
-    //    currentROMbank_lo5 = currentROMbank_lo5 & (number_of_rom_banks - 1);
-    // this is checked on the fly
 }
 
 void memory::MBC2_ramenable_rombankswitch(uint16_t address, uint8_t data) {
@@ -388,39 +400,33 @@ void memory::MBC3_latch_time() {
     MBC3_RTC_latch = false;
 }
 
-void memory::changeHirombank(uint8_t data) {
-    //Note: this isn't needed anymore since I'm only using the RAMbank number now
-    // and concatenating when needed
-    //change upper ROM bank number bits in MBC1 mode
-    currentROMbank_lo &= 0x1F; //turn off upper 3 bits
-    data &= 0xE0; //turn off lower 5 bits of data
-    currentROMbank_lo |= data;
-    if (currentROMbank_lo == 0) currentROMbank_lo = 1;
-    if (mbc_type == MBC1)
-        if (currentROMbank_lo == 0x0)
-            currentROMbank_lo = data + 1; //MBC1 bug
-    // truncate bits for larger currentTROMbank larger than
-    // the number of actual rom banks
-    if (mbc_type == MBC1)
-        if (currentROMbank_lo > number_of_rom_banks)
-            currentROMbank_lo = currentROMbank_lo & (number_of_rom_banks - 1);
+void memory::MBC5_change_ROMbank_lo(uint8_t value) {
+    MBC5_currentROMbank &= 0x0100; //preserve upper bit
+    MBC5_currentROMbank |= value;
+}
+
+void memory::MBC5_change_ROMbank_hi(uint8_t value) {
+    //TODO: confirm that this only works for 1 and not any nonzero value
+    MBC5_currentROMbank &= 0x00FF; //preserve bottom 8 bits
+    MBC5_currentROMbank |= (value << 8) & 0x0100;
 }
 
 void memory::rambankchange(uint8_t data) {
-
-    currentRAMbank_rombank_hi = data & 0x3;
-    if (mbc_type == MBC1)
+    if (mbc_type == MBC1) {
+        currentRAMbank_rombank_hi = data & 0x3;
         if (currentROMbank_lo == 0x00)
             currentROMbank_lo = 1; //MBC1 bug
+    }
+    else if (mbc_type == MBC5) {
+        if (hasRumble) // bit 3 is unused and goes to motor
+            currentRAMbank_rombank_hi = data & 0x7;
+        else
+            currentRAMbank_rombank_hi = data & 0xF;
+    }
 }
 
 void memory::changeromrammode(uint8_t data) {
     MBC1bankingmode1 = ((data & 0x1) == 1);
-    //if (!MBC1bankingmode1) currentRAMbank_rombank_hi2 = 0;
-    //GB can only access RAM bank 0 while ROM banking
-    // is this true? pandocs doesn't say anything about it
-    // yes, according to gbdev.gg8.se
-    //Last line no longer needed since this is done on the fly
 }
 
 void memory::request_interrupt(uint8_t irq_num) {

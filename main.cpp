@@ -54,9 +54,7 @@ int main(int argc, char **argv) { //scale as an integer, cycle period in ms, ROM
 
     //gb cpu{};
     sharedMemory.LoadROM(romFileName);
-    std::printf("Loaded ROM image ");
-    std::printf(romFileName);
-    std::printf("\n");
+    std::printf("Loaded ROM image %s\n", romFileName);
     bool quit = false;
 
     currenttime = std::chrono::steady_clock::now();
